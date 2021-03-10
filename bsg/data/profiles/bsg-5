@@ -1,0 +1,5 @@
+AS="1"
+AS_TRANSCODE="true"
+COPIES="1,3,4"
+# just a dts-hd ma stream
+CUT_STREAMS=("0:0" "0:1")

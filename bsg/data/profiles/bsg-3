@@ -1,0 +1,5 @@
+AS="1"
+AS_TRANSCODE="true"
+COPIES="1,3,4,5"
+# a dts-hd ma and ac3 stereo stream
+CUT_STREAMS=("0:0" "0:1" "0:3")

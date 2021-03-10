@@ -1,0 +1,19 @@
+This is my dvd ripping work area. The shell scripts are oriented around pulling the image from a disc into a folder, then converting titles into mp4's. The directories prefixed with "__" are the working dirs that files move through. At present (Sep 2016), the workflow goes:
+
+1. auto-mkv-disc.sh : Use MakeMkv cli tool to rip titles from a disc to __mkv_from_disc... directory
+2. look through titles, name the ones I want to keep, and move them to __mp4-these directory. delete the others.
+3. open a Git Bash shell, go to /d/dev/projects/vms/compile-handbrake, and 'vagrant up && vagrant ssh'.
+4. in the vm, 'cd /vagrant_data' and run 'bash auto-mp4-vagrant.sh'
+5. output goes to __freshly-encoded as mkv, despite the script name; move the compressed files to the appropriate dir in d: where plex will find them.
+
+#### Notes on linux ripping machine
+
+Going through lots of work right now to figure out how to rip with an updated x264 because i think the seg faults i'm getting
+are because of that. Apparently handbrake has x264 built in, so i have to compile that from source. Working on that now.
+I've already successfully compiled x264 independently, as well as yasm, which x264 depended on. I think handbrake does too. On
+a new Ubuntu VM, only python3 is available, which handbrake apparently doesn't like, so I'm trying python-2.7.
+
+libxml2 was a major pain. i ended up setting the appropriate build vars manually after much mucking around and trying
+to guess the right search terms to find a solution:
+export LIBXML2_CFLAGS=`xml2-config --cflags`
+export LIBXML2_LIBS=`xml2-config --libs`
