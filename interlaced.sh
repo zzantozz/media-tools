@@ -1,19 +1,27 @@
-#!/bin/bash
+#!/bin/bash -e
 
 [ $# -eq 1 ] || {
-	echo "Pass a video file to check if it's interlaced."
-	echo "Prints 'interlaced' if interlaced."
-	echo "Prints 'progressive' if progressive."
+	echo "Pass a video file to check if it's interlaced." >&2
+	echo "Prints 'interlaced' if interlaced." >&2
+	echo "Prints 'progressive' if progressive." >&2
 	exit 1
+}
+
+function debug {
+    [ "$DEBUG" = "interlaced" ] && echo -e "$1" 1>&2
+    return 0
 }
 
 BASENAME=$(basename "$1")
 STATEFILE="BSG/state/interlaced/$BASENAME"
-[ "$DEBUG" = true ] && echo "Check state file: $STATEFILE"
+debug "Check state file: $STATEFILE"
 [ -f "$STATEFILE" ] && cat "$STATEFILE" && exit 0
 
-DATA=$(ffmpeg -i "$1" -an -frames:v 1000 -filter:v idet -f rawvideo -y /dev/null 2>&1 | grep -i 'parsed_idet')
-[ "$DEBUG" = true ] && echo "$DATA"
+DATA=$(ffmpeg -i "$1" -an -frames:v 1000 -filter:v idet -f rawvideo -y /dev/null 2>&1 | grep -i 'parsed_idet') || {
+    echo "ffmpeg failed to parse file: '$1'" >&2
+    exit 1
+}
+debug "$DATA"
 
 RE1="Single frame detection: TFF: *([[:digit:]]+) *BFF: *([[:digit:]]+) *Progressive: *([[:digit:]]+) *Undetermined: *([[:digit:]]+)"
 RE2="Multi frame detection: TFF: *([[:digit:]]+) *BFF: *([[:digit:]]+) *Progressive: *([[:digit:]]+) *Undetermined: *([[:digit:]]+)"
@@ -24,7 +32,7 @@ RE2="Multi frame detection: TFF: *([[:digit:]]+) *BFF: *([[:digit:]]+) *Progress
 	echo "No match on single frame detection" >&2
 	exit 1
 }
-[ "$DEBUG" = true ] && echo $TFF1 $BFF1 $PROG1 $UNDET1
+debug $TFF1 $BFF1 $PROG1 $UNDET1
 
 [[ $DATA =~ $RE2 ]] && {
 	TFF2="${BASH_REMATCH[1]}" && BFF2="${BASH_REMATCH[2]}" && PROG2="${BASH_REMATCH[3]}" && UNDET2="${BASH_REMATCH[4]}"
@@ -32,7 +40,7 @@ RE2="Multi frame detection: TFF: *([[:digit:]]+) *BFF: *([[:digit:]]+) *Progress
 	echo "No match on multi frame detection" >&2
 	exit 1
 }
-[ "$DEBUG" = true ] && echo $TFF2 $BFF2 $PROG2 $UNDET2
+debug $TFF2 $BFF2 $PROG2 $UNDET2
 
 [ $UNDET1 -gt $TFF1 -a $UNDET1 -gt $BFF1 -a $UNDET1 -gt $PROG1 ] && {
 	echo "Single frame detection was undetermined" >&2
