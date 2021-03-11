@@ -8,18 +8,21 @@ mkdir -p "$DONEDIR"
 LOGDIR="cache/log"
 export LOGDIR
 mkdir -p "$LOGDIR"
+# Contains config files with data for each movie file to be encoded.
+CONFIGDIR="data/config"
+export CONFIGDIR
 # Directory to scan for raw mkv's ripped from disc
-INPUTDIR="/media/plex-media-2/ripping"
+INPUTDIR="/media/plex-media-2/ripping/movies-in"
 export INPUTDIR
 # Root directory of movies library, where final transcoded movies go, possibly in a subdirectory to organize
 # related items the way Plex likes them.
 MOVIESDIR="/media/plex-media/movies"
 export MOVIESDIR
 # Directory holding general ripping tools
-TOOLSDIR="/media/plex-media-2/ripping"
+TOOLSDIR="/media/plex-media-2/ripping/tools"
 export TOOLSDIR
 
-export DONES=$(ls "$DONEDIR")
+export DONES=$(find "$DONEDIR" -type f)
 
 # List of outputs to build the map values from in the function. Can't be an array because those can't be exported.
 OUTSTRING="[outa] [outb] [outc] [outd] [oute] [outf] [outg] [outh] [outi] [outj] [outkl] [outm] [outn] [outo] [outp] [outq]"
@@ -37,105 +40,125 @@ function encode_one {
 	exit 1
     }
     set -e
-    NEXT="$1"
-    BASENAME=$(basename "$NEXT")
+    # Absolute path to the movie file
+    FULLPATH="$1"
+    # The unique name for this movie, consisting of the parent dir and file name
+    PARTIALNAME="${1#$INPUTDIR/}"
     DONE=false
-    echo "$DONES" | grep "$BASENAME" > /dev/null && DONE=true
+    echo "$DONES" | grep "$PARTIALNAME" > /dev/null && DONE=true
     [ "$ONE" != "true" ] && [ $DONE = true ] && {
-	debug "$BASENAME is done"
+	debug "$PARTIALNAME is done"
 	return 0
     }
-    echo "Processing $BASENAME"
-    exit 1
-    INTERLACED=$(./interlaced.sh "$NEXT")
-    debug "Interlacing=$INTERLACED"
-    [ $INTERLACED = interlaced ] && {
-	echo "Interlaced video handling disabled because I'm not sure how to make it work"
-	echo "with the -filter_complex. If this comes up, gotta figure out how to add the"
-	echo "yadif filter to it. Also don't use the name FILTER here. It's used later."
+    echo "Processing $PARTIALNAME"
+    # For now, processing any movie file requires a config because only manual
+    # inspection can tell which streams to keep. Loading the config early also
+    # gives a place to eagerly set things that could be discovered later but
+    # may fail, like the interlace value.
+    CONFIGFILE="$CONFIGDIR/$PARTIALNAME"
+    if [ -f "$CONFIGFILE" ]; then
+	debug "Using config: $CONFIGFILE"
+	source "$CONFIGFILE"
+    else
+	echo "Missing config file: $CONFIGFILE" >&2
 	exit 1
+    fi
+    # Let interlace value be set in config. Otherwise, figure it out.
+    [ -z "$INTERLACED" ] && INTERLACED=$("$TOOLSDIR/interlaced.sh" "$FULLPATH")
+    debug "Interlacing: $INTERLACED"
+    VFILTER=unset
+    [ $INTERLACED = interlaced ] && VFILTER="-filter:v:0 yadif"
+    [ $INTERLACED = progressive ] && VFILTER=""
+    [ "$VFILTER" = "unset" ] && {
+    	echo "Invalid interlace value: '$INTERLACED'" >&2
+    	exit 1
     }
-    #FILTER=unset
-    #[ $INTERLACED = interlaced ] && FILTER="-filter:v:0 yadif"
-    #[ $INTERLACED = progressive ] && FILTER=""
-    #[ "$FILTER" = "unset" ] && {
-    #	echo "Invalid interlace value: '$INTERLACED'"
-    #	exit 1
-    #}
-    VQ=$("$TOOLSDIR/quality.sh" "$NEXT")
-    INPUT="$NEXT"
+    debug "vfilter: '$VFILTER'"
+    VQ=$("$TOOLSDIR/quality.sh" "$FULLPATH")
+    debug "Quality: $VQ"
     [ "$QUALITY" = "rough" ] && {
-	OUTPUT="$TOOLSDIR/test-encode-$BASENAME"
+	OUTPUT="$TOOLSDIR/test-encode-$(basename $FULLPATH)"
     } || {
-	OUTPUT="/media/plex-media/tv-shows/Battlestar Galactica (2003)/Season $SEASON/$BASENAME"
-	echo "Figure out how to manage output here" > &2
+	[ -n "$OUTPUTNAME" ] || {
+	    echo "OUTPUTNAME not set in config: $CONFIGFILE" >&2
+	    exit 1
+	}
+	OUTPUT="$MOVIESDIR/$(dirname "$PARTIALNAME")/$OUTPUTNAME"
+    }
+    if [ -f "data/cuts/$PARTIALNAME" ]; then
+	echo "Video cutting with complex_filter not yet implemented here" >&2
+	COMPLEXFILTER=$("$TOOLSDIR/filter.sh" "$NEXT")
+	debug "complex_filter: $COMPLEXFILTER"
+	exit 1
+    else
+	COMPLEXFILTER=""
+    fi
+    [ -n "$VFILTER" ] && [ -n "$COMPLEXFILTER" ] && {
+	echo "Video is interlaced (needs yadif filter) and also has a" >&2
+	echo "complex_filter generated for it. If this comes up, gotta" >&2
+	echo "figure out how to apply both filters at the same time." >&2
 	exit 1
     }
-    echo "No profiles. Should look up a config based on input file." > &2
-    exit 1
-#    PROFILE=$(./profile.sh "$NEXT")
-#    PROFILECONFIGFILE="./data/profiles/$PROFILE"
-#    [ -f "$PROFILECONFIGFILE" ] && {
-#	debug "Using profile config $PROFILECONFIGFILE"
-#	PROFILECONFIG=$(cat "$PROFILECONFIGFILE") 
-#    } || {
-#	echo "No profile config, skipping"
-#	return 0
-#    }
-#    source "$PROFILECONFIGFILE"
-    FILTER=$(./filter.sh "$NEXT")
-    debug "Filter: $FILTER"
-    [ -n "$CUT_STREAMS" ] || {
-	echo "CUT_STREAMS should be known by now"
+    [ -n "$KEEP_STREAMS" ] || {
+	echo "KEEP_STREAMS should be known by now"
 	exit 1
     }
-    NMAPS="${#CUT_STREAMS[@]}"
-    NMAPS=$((NMAPS-1))
     MAPS=""
-    [ -n "$FILTER" ] && {
+    [ -n "$COMPLEXFILTER" ] && {
+	NMAPS="${#KEEP_STREAMS[@]}"
+	NMAPS=$((NMAPS-1))
 	ALLOUTS=($OUTSTRING)
 	for I in $(seq 0 $NMAPS); do
 	    MAPS="$MAPS -map ${ALLOUTS[$I]}"
 	done
     } || {
-	STREAMS="${CUT_STREAMS[@]}"
+	STREAMS="${KEEP_STREAMS[@]}"
 	for S in $STREAMS; do
 	    MAPS="$MAPS -map $S"
 	done
     }
+    [ -n "$TRANSCODE_AUDIO" ] && {
+	TAILMAPS="${MAPS# -map 0:0}"
+	MAPS="-map 0:0 -map $TRANSCODE_AUDIO $TAILMAPS"
+    }
     debug "MAPS: $MAPS"
     # Use locally installed ffmpeg, or a docker container?
-    echo "This is here to mount in the container so the output path exists." >&2
-    echo "Fixing depends on how the output path was determined previously." >&2
-    exit 1
-    SHOWS="/media/plex-media/tv-shows"
     CMD=(ffmpeg)
-    #CMD=(docker run --rm -v "$TOOLSDIR":"$TOOLSDIR" -v "$SHOWS":"$SHOWS" -w "$(pwd)" jrottenberg/ffmpeg -stats)
-    CMD+=(-hide_banner -y -i "$NEXT")
-    [ -z "$FILTER" ] || CMD+=(-filter_complex "$FILTER")
-    CMD+=($MAPS)
+    #CMD=(docker run --rm -v "$TOOLSDIR":"$TOOLSDIR" -v "$MOVIESDIR":"$MOVIESDIR" -w "$(pwd)" jrottenberg/ffmpeg -stats)
+    CMD+=(-hide_banner -y -i "$FULLPATH")
+    [ -z "$COMPLEXFILTER" ] || CMD+=(-filter_complex "$COMPLEXFILTER")
+    CMD+=($MAPS -c copy)
+    [ -z "$VFILTER" ] || CMD+=($VFILTER)
     # Do real video encoding, or speed encode for checking the output?
     [ "$QUALITY" = "rough" ] && {
 	#CMD+=(-c:0 mpeg2video -threads:0 2)
 	CMD+=(-c:0 libx264 -preset ultrafast)
     } || {
-	CMD+=(-c:0 libx265 -crf:0 20)
+	CMD+=(-c:0 libx265 -crf:0 "$VQ")
     }
-    CMD+=(-c:1 ac3 -ac:1 6 -b:1 384k)
-    # when there's a second audio stream, it's a stereo commentary stream
-    CMD+=(-c:2 ac3 -ac:2 2 -b:2 192k)
+    [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ] && {
+	CMD+=(-c:1 ac3 -ac:1 6 -b:1 384k)
+    }
     CMD+=(-metadata:s:0 "encoded_by=My smart encoder script")
-    CMD+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
+    [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ] && {
+	CMD+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
+    }
+    CMD+=($FFMPEG_EXTRA_OPTIONS)
     CMD+=("$OUTPUT")
+    LOGFILE="$LOGDIR/$PARTIALNAME.log"
+    DONEFILE="$DONEDIR/$PARTIALNAME"
 
     for arg in "${CMD[@]}"; do
 	echo -n "\"${arg//\"/\\\"}\" "
     done
-    echo "&> \"$LOGDIR/$BASENAME.log\""
+    echo "&> \"$LOGFILE\""
     date
-    "${CMD[@]}" &> "$LOGDIR/$BASENAME.log"
+    mkdir -p "$(dirname "$OUTPUT")"
+    mkdir -p "$(dirname "$LOGFILE")"
+    mkdir -p "$(dirname "$DONEFILE")"
+    "${CMD[@]}" &> "$LOGFILE"
     date
-    "$TOOLSDIR/done.sh" "$NEXT" "$LOGDIR" && touch "$DONEDIR/$BASENAME" || {
+    "$TOOLSDIR/done.sh" "$PARTIALNAME" "$LOGDIR" && touch "$DONEDIR/$PARTIALNAME" || {
 	    echo ""
 	    echo "Encoding not done?"
 	    exit 1
@@ -146,7 +169,4 @@ export -f encode_one
 
 [ $# -eq 1 ] && ONE=true
 [ "$ONE" = true ] && encode_one "$1"
-echo "What should the input path be? It should contain movie files." >&2
-echo "The configs for the files should map them to appropriate output paths?" >&2
-exit 1
 [ -z "$ONE" ] && find "$INPUTDIR" -name '*.mkv' -print0 | xargs -0I {} bash -c 'encode_one "{}"'
