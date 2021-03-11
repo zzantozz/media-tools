@@ -40,3 +40,10 @@ as the mkv.
 
 1. Touches the done file in `cache/done` when it finishes, but
 only after checking the log output with the `done.sh` script.
+
+Additional features:
+
+Setting `QUALITY=rough` makes the script use a faster, lower-quality
+video encoder and output to the ripping directory instead of the true
+output directory. This feature lets you more quickly test any video
+cuts you've made.
