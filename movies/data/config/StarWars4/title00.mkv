@@ -1,0 +1,4 @@
+OUTPUTNAME="Star Wars Episode 4 - A New Hope.mkv"
+KEEP_STREAMS=(0:0 0:1 0:3 0:4 0:5)
+FFMPEG_EXTRA_OPTIONS="-disposition:s:1 forced"
+INTERLACED=progressive
