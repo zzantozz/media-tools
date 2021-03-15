@@ -22,8 +22,6 @@ export MOVIESDIR
 TOOLSDIR="/media/plex-media-2/ripping/tools"
 export TOOLSDIR
 
-export DONES=$(find "$DONEDIR" -type f)
-
 # List of outputs to build the map values from in the function. Can't be an array because those can't be exported.
 OUTSTRING="[outa] [outb] [outc] [outd] [oute] [outf] [outg] [outh] [outi] [outj] [outkl] [outm] [outn] [outo] [outp] [outq]"
 export OUTSTRING
@@ -44,25 +42,40 @@ function encode_one {
     FULLPATH="$1"
     # The unique name for this movie, consisting of the parent dir and file name
     PARTIALNAME="${1#$INPUTDIR/}"
-    DONE=false
-    echo "$DONES" | grep "$PARTIALNAME" > /dev/null && DONE=true
-    [ "$ONE" != "true" ] && [ $DONE = true ] && {
-	debug "$PARTIALNAME is done"
-	return 0
-    }
-    echo "Processing $PARTIALNAME"
     # For now, processing any movie file requires a config because only manual
     # inspection can tell which streams to keep. Loading the config early also
     # gives a place to eagerly set things that could be discovered later but
     # may fail, like the interlace value.
     CONFIGFILE="$CONFIGDIR/$PARTIALNAME"
     if [ -f "$CONFIGFILE" ]; then
+	CONFIGDIR="$(dirname "$CONFIGFILE")"
+	MAINFILE="$CONFIGDIR/main"
+	if [ -f "$MAINFILE" ]; then
+	    debug "Loading main movie config: $MAINFILE"
+	    source "$MAINFILE" || {
+		echo "Failed to source $MAINFILE" >&2
+		exit 1
+	    }
+	fi
 	debug "Using config: $CONFIGFILE"
-	source "$CONFIGFILE"
+	source "$CONFIGFILE" || {
+	    echo "Failed to source $CONFIGFILE" >&2
+	    exit 1
+	}
     else
 	echo "Missing config file: $CONFIGFILE" >&2
 	exit 1
     fi
+    [ -z "$MOVIENAME" ] && MOVIENAME="$(dirname "$PARTIALNAME")"
+    PARTIALOUTPUT="$MOVIENAME/$OUTPUTNAME"
+    DONEFILE="$DONEDIR/$PARTIALOUTPUT"
+    DONE=false
+    [ -f "$DONEFILE" ] && DONE=true
+    [ "$ONE" != "true" ] && [ $DONE = true ] && {
+	echo "$PARTIALNAME -> $PARTIALOUTPUT is done" >&2
+	return 0
+    }
+    echo "Processing $PARTIALNAME into $PARTIALOUTPUT" >&2
     # Let interlace value be set in config. Otherwise, figure it out.
     [ -z "$INTERLACED" ] && INTERLACED=$("$TOOLSDIR/interlaced.sh" "$FULLPATH")
     debug "Interlacing: $INTERLACED"
@@ -74,16 +87,26 @@ function encode_one {
     	exit 1
     }
     debug "vfilter: '$VFILTER'"
+    [ "$CROPPING" = none ] || CROPPING=$($TOOLSDIR/crop.sh "$FULLPATH") || {
+	echo "Crop detection failed" >&2
+	exit 1
+    }
+    debug "Cropping: $CROPPING"
     VQ=$("$TOOLSDIR/quality.sh" "$FULLPATH")
     debug "Quality: $VQ"
+    [ -n "$VFILTER" ] && [ -n "$CROPPING" ] && {
+	echo "Verify that vfilter and cropping will work together" >&2
+	exit 1
+    }
     [ "$QUALITY" = "rough" ] && {
-	OUTPUT="$TOOLSDIR/test-encode-$(basename $FULLPATH)"
+	OUTPUT="$TOOLSDIR/test-encode-$(basename "$PARTIALOUTPUT")"
     } || {
 	[ -n "$OUTPUTNAME" ] || {
 	    echo "OUTPUTNAME not set in config: $CONFIGFILE" >&2
 	    exit 1
 	}
-	OUTPUT="$MOVIESDIR/$(dirname "$PARTIALNAME")/$OUTPUTNAME"
+	# Let movie name be set in config
+	OUTPUT="$MOVIESDIR/$PARTIALOUTPUT"
     }
     if [ -f "data/cuts/$PARTIALNAME" ]; then
 	echo "Video cutting with complex_filter not yet implemented here" >&2
@@ -118,8 +141,8 @@ function encode_one {
 	done
     }
     [ -n "$TRANSCODE_AUDIO" ] && {
-	TAILMAPS="${MAPS# -map 0:0}"
-	MAPS="-map 0:0 -map $TRANSCODE_AUDIO $TAILMAPS"
+	MAPS="${MAPS# -map 0:0}"
+	MAPS="-map 0:0 -map $TRANSCODE_AUDIO $MAPS"
     }
     debug "MAPS: $MAPS"
     # Use locally installed ffmpeg, or a docker container?
@@ -129,6 +152,7 @@ function encode_one {
     [ -z "$COMPLEXFILTER" ] || CMD+=(-filter_complex "$COMPLEXFILTER")
     CMD+=($MAPS -c copy)
     [ -z "$VFILTER" ] || CMD+=($VFILTER)
+    [ -n "$CROPPING" ] && [ "$CROPPING" != none ] && CMD+=(-filter:v:0 $CROPPING)
     # Do real video encoding, or speed encode for checking the output?
     [ "$QUALITY" = "rough" ] && {
 	#CMD+=(-c:0 mpeg2video -threads:0 2)
@@ -145,8 +169,8 @@ function encode_one {
     }
     CMD+=($FFMPEG_EXTRA_OPTIONS)
     CMD+=("$OUTPUT")
-    LOGFILE="$LOGDIR/$PARTIALNAME.log"
-    DONEFILE="$DONEDIR/$PARTIALNAME"
+    LOGFILE="$LOGDIR/$MOVIENAME/$OUTPUTNAME.log"
+    DONEFILE="$DONEDIR/$MOVIENAME/$OUTPUTNAME"
 
     for arg in "${CMD[@]}"; do
 	echo -n "\"${arg//\"/\\\"}\" "
@@ -158,15 +182,18 @@ function encode_one {
     mkdir -p "$(dirname "$DONEFILE")"
     "${CMD[@]}" &> "$LOGFILE"
     date
-    "$TOOLSDIR/done.sh" "$PARTIALNAME" "$LOGDIR" && touch "$DONEDIR/$PARTIALNAME" || {
-	    echo ""
-	    echo "Encoding not done?"
-	    exit 1
-	}
+    if "$TOOLSDIR/done.sh" "$PARTIALOUTPUT" "$LOGDIR"; then
+	mkdir -p "$(dirname "$DONEFILE")"
+	touch "$DONEFILE"
+    else
+	echo ""
+	echo "Encoding not done?"
+	exit 1
+    fi
     echo ""
 }
 export -f encode_one
 
 [ $# -eq 1 ] && ONE=true
 [ "$ONE" = true ] && encode_one "$1"
-[ -z "$ONE" ] && find "$INPUTDIR" -name '*.mkv' -print0 | xargs -0I {} bash -c 'encode_one "{}"'
+[ -z "$ONE" ] && find "$INPUTDIR" -name '*.mkv' -mmin +2 -print0 | xargs -0I {} bash -c 'encode_one "{}"'
