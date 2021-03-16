@@ -17,11 +17,40 @@ VALIDS=(
 )
 
 while read -r line; do
-    key="${line%=*}"
+    key="${line%%=*}"
     [[ "${VALIDS[@]}" =~ $key ]] || {
-	echo "Invalid key" >&2
-	echo "Key: $key" >&2
-	echo "File: $1" >&2
+	echo "Invalid key: $key"
 	exit 1
     }
 done < "$1"
+
+source "$1"
+
+if [ "$(basename "$1")" = "main" ]; then
+    [ -n "$MOVIENAME" ] || {
+	echo "Doesn't set a MOVIENAME"
+	exit 1
+    }
+else
+    [ -n "$OUTPUTNAME" ] || {
+	echo "Doesn't set an OUTPUTNAME"
+	exit 1
+    }
+    [[ "$OUTPUTNAME" =~ \.mkv$ ]] || {
+	echo "OUTPUTNAME doesn't end with .mkv"
+	exit 1
+    }
+    STREAMS="${KEEP_STREAMS[@]}"
+    [ -n "$STREAMS" ] || {
+	echo "Doesn't set KEEP_STREAMS"
+	exit 1
+    }
+    [ "${#KEEP_STREAMS[@]}" -gt 1 ] || {
+	echo "KEEP_STREAMS should be an array with more than one thing in it"
+	exit 1
+    }
+    [ -z "$CROPPING" ] || [ "$CROPPING" = none ] || [[ "$CROPPING" =~ ^crop= ]] || {
+	echo "CROPPING should be set to 'none' or a 'crop=...' value"
+	exit 1
+    }
+fi
