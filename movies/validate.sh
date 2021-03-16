@@ -40,6 +40,28 @@ else
 	echo "OUTPUTNAME doesn't end with .mkv"
 	exit 1
     }
+    MATCH=false
+    PLEXDIRS=("Behind The Scenes" "Deleted Scenes" "Featurettes" "Interviews" "Scenes" "Shorts" "Trailers" "Other")
+    for p in "${PLEXDIRS[@]}"; do
+	[[ "$OUTPUTNAME" =~ ^$p/ ]] && MATCH=true
+    done
+    [ "$MATCH" = true ] || {
+	# If not in a Plex dir, it should be the main movie file, named the same as the movie directory
+	CONFIGDIR="$(dirname "$1")"
+	MAIN="$(cat "$CONFIGDIR/main" | tr -d '\n')"
+	EXPECTED="MOVIENAME=\"${OUTPUTNAME%.*}\""
+	[ "$MAIN" = "$EXPECTED" ] && MATCH=true
+    }
+    [ "$MATCH" = true ] || {
+	echo "OUTPUTNAME doesn't match the movie name and doesn't put the output file in a known Plex dir:"
+	echo "  $OUTPUTNAME"
+	echo "Acceptable dirs are:"
+	echo -n "  "
+	for p in "${PLEXDIRS[@]}"; do
+	    echo -n "\"$p\" "
+	done
+	exit 1
+    }
     STREAMS="${KEEP_STREAMS[@]}"
     [ -n "$STREAMS" ] || {
 	echo "Doesn't set KEEP_STREAMS"
