@@ -79,25 +79,20 @@ function encode_one {
     # Let interlace value be set in config. Otherwise, figure it out.
     [ -z "$INTERLACED" ] && INTERLACED=$("$TOOLSDIR/interlaced.sh" "$FULLPATH")
     debug "Interlacing: $INTERLACED"
-    VFILTER=unset
-    [ $INTERLACED = interlaced ] && VFILTER="-filter:v:0 yadif"
-    [ $INTERLACED = progressive ] && VFILTER=""
-    [ "$VFILTER" = "unset" ] && {
+    VFILTERS=()
+    [ "$INTERLACED" = interlaced ] && VFILTERS+=("yadif")
+    [ "$INTERLACED" = progressive ] || [ "$INTERLACED" = interlaced ] || {
     	echo "Invalid interlace value: '$INTERLACED'" >&2
     	exit 1
     }
-    debug "vfilter: '$VFILTER'"
-    [ "$CROPPING" = none ] || CROPPING=$($TOOLSDIR/crop.sh "$FULLPATH") || {
+    [ -n "$CROPPING" ] || CROPPING=$($TOOLSDIR/crop.sh "$FULLPATH") || {
 	echo "Crop detection failed" >&2
 	exit 1
     }
     debug "Cropping: $CROPPING"
+    [ -n "$CROPPING" ] && [ "$CROPPING" != none ] && VFILTERS+=("$CROPPING")
     VQ=$("$TOOLSDIR/quality.sh" "$FULLPATH")
     debug "Quality: $VQ"
-    [ -n "$VFILTER" ] && [ -n "$CROPPING" ] && {
-	echo "Verify that vfilter and cropping will work together" >&2
-	exit 1
-    }
     [ "$QUALITY" = "rough" ] && {
 	OUTPUT="$TOOLSDIR/test-encode-$(basename "$PARTIALOUTPUT")"
     } || {
@@ -116,8 +111,8 @@ function encode_one {
     else
 	COMPLEXFILTER=""
     fi
-    [ -n "$VFILTER" ] && [ -n "$COMPLEXFILTER" ] && {
-	echo "Video is interlaced (needs yadif filter) and also has a" >&2
+    [ "${#VFILTERS[@]}" -gt 0 ] && [ -n "$COMPLEXFILTER" ] && {
+	echo "Video has filtering from here and also has a" >&2
 	echo "complex_filter generated for it. If this comes up, gotta" >&2
 	echo "figure out how to apply both filters at the same time." >&2
 	exit 1
@@ -145,14 +140,19 @@ function encode_one {
 	MAPS="-map 0:0 -map $TRANSCODE_AUDIO $MAPS"
     }
     debug "MAPS: $MAPS"
+    VFILTERSTRING="${VFILTERS[0]}"
+    i=1
+    while [ $i -lt "${#VFILTERS[@]}" ]; do
+	VFILTERSTRING="$VFILTERSTRING,${VFILTERS[$i]}"
+	i=$((i+1))
+    done
     # Use locally installed ffmpeg, or a docker container?
     CMD=(ffmpeg)
     #CMD=(docker run --rm -v "$TOOLSDIR":"$TOOLSDIR" -v "$MOVIESDIR":"$MOVIESDIR" -w "$(pwd)" jrottenberg/ffmpeg -stats)
     CMD+=(-hide_banner -y -i "$FULLPATH")
     [ -z "$COMPLEXFILTER" ] || CMD+=(-filter_complex "$COMPLEXFILTER")
     CMD+=($MAPS -c copy)
-    [ -z "$VFILTER" ] || CMD+=($VFILTER)
-    [ -n "$CROPPING" ] && [ "$CROPPING" != none ] && CMD+=(-filter:v:0 $CROPPING)
+    [ -n "$VFILTERSTRING" ] && CMD+=("-filter:v:0" "$VFILTERSTRING")
     # Do real video encoding, or speed encode for checking the output?
     [ "$QUALITY" = "rough" ] && {
 	#CMD+=(-c:0 mpeg2video -threads:0 2)
