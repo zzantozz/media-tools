@@ -1,0 +1,3 @@
+OUTPUTNAME="Shorts/Surround Test.mkv"
+KEEP_STREAMS=(0:0 0:1 0:2 0:1 0:2)
+FFMPEG_EXTRA_OPTIONS="-c:a:2 ac3 -b:a:2 640k -ac:a:2 6 -c:a:3 ac3 -b:a:3 640k -ac:a:3 6"
