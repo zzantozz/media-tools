@@ -26,6 +26,9 @@ export TOOLSDIR
 OUTSTRING="[outa] [outb] [outc] [outd] [oute] [outf] [outg] [outh] [outi] [outj] [outkl] [outm] [outn] [outo] [outp] [outq]"
 export OUTSTRING
 
+# If DRYRUN is set, export it so the function sees it
+[ -n "$DRYRUN" ] && export DRYRUN
+
 function debug {
     [ "$DEBUG" = "encode" ] && echo -e "$1" 1>&2
     return 0
@@ -72,7 +75,7 @@ function encode_one {
     DONE=false
     [ -f "$DONEFILE" ] && DONE=true
     [ "$ONE" != "true" ] && [ $DONE = true ] && {
-	echo "$PARTIALNAME -> $PARTIALOUTPUT is done" >&2
+	echo "Done: $PARTIALNAME -> $PARTIALOUTPUT" >&2
 	return 0
     }
     echo "Processing $PARTIALNAME into $PARTIALOUTPUT" >&2
@@ -175,13 +178,19 @@ function encode_one {
     for arg in "${CMD[@]}"; do
 	echo -n "\"${arg//\"/\\\"}\" "
     done
+    DUR=$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=DURATION-eng -of default=noprint_wrappers=1:nokey=1 "$FULLPATH" | cut -d '.' -f 1)
     echo "&> \"$LOGFILE\""
-    date
+    echo "Duration: $DUR"
+    echo "Start: $(date)"
     mkdir -p "$(dirname "$OUTPUT")"
     mkdir -p "$(dirname "$LOGFILE")"
     mkdir -p "$(dirname "$DONEFILE")"
-    "${CMD[@]}" &> "$LOGFILE"
-    date
+    if [ -n "$DRYRUN" ]; then
+	echo "  -- dry run requested, not running"
+    else
+	"${CMD[@]}" &> "$LOGFILE"
+    fi
+    echo "End  : $(date)"
     if "$TOOLSDIR/done.sh" "$PARTIALOUTPUT" "$LOGDIR"; then
 	mkdir -p "$(dirname "$DONEFILE")"
 	touch "$DONEFILE"
