@@ -1,2 +1,3 @@
 OUTPUTNAME="The Hunger Games - Mockingjay 1.mkv"
 KEEP_STREAMS=(0:0 0:2 0:1 0:6 0:7)
+FFMPEG_EXTRA_OPTIONS="-max_muxing_queue_size 1024"
