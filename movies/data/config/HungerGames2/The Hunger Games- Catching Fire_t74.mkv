@@ -1,3 +1,2 @@
 OUTPUTNAME="Behind The Scenes/Collection.mkv"
 KEEP_STREAMS=(0:0 0:1)
-CROPPING=none

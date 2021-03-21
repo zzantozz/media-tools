@@ -88,12 +88,13 @@ function encode_one {
     	echo "Invalid interlace value: '$INTERLACED'" >&2
     	exit 1
     }
+    debug "Detect cropping..."
     [ -n "$CROPPING" ] || CROPPING=$($TOOLSDIR/crop.sh "$FULLPATH") || {
 	echo "Crop detection failed" >&2
 	exit 1
     }
     debug "Cropping: $CROPPING"
-    [ -n "$CROPPING" ] && [ "$CROPPING" != none ] && VFILTERS+=("$CROPPING")
+    [ -n "$CROPPING" ] && [ "$CROPPING" != none ] && VFILTERS+=("crop=$CROPPING")
     VQ=$("$TOOLSDIR/quality.sh" "$FULLPATH")
     debug "Quality: $VQ"
     [ "$QUALITY" = "rough" ] && {

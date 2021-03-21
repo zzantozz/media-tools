@@ -1,4 +1,3 @@
 OUTPUTNAME="Shorts/Superman and the Mole-Men.mkv"
 KEEP_STREAMS=(0:0 0:1 0:6)
 INTERLACED=progressive
-CROPPING="crop=704:480:10:0"
