@@ -153,6 +153,9 @@ function encode_one {
     CMD=(ffmpeg)
     #CMD=(docker run --rm -v "$TOOLSDIR":"$TOOLSDIR" -v "$MOVIESDIR":"$MOVIESDIR" -w "$(pwd)" jrottenberg/ffmpeg -stats)
     CMD+=(-hide_banner -y -i "$FULLPATH")
+    # This because several videos end up failing with the "Too many packets buffered for output stream XXX" error.
+    # I don't think this will cause any problems.
+    CMD+=(-max_muxing_queue_size 1024)
     [ -z "$COMPLEXFILTER" ] || CMD+=(-filter_complex "$COMPLEXFILTER")
     CMD+=($MAPS -c copy)
     [ -n "$VFILTERSTRING" ] && CMD+=("-filter:v:0" "$VFILTERSTRING")
