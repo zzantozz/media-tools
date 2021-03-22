@@ -1,0 +1,3 @@
+OUTPUTNAME="Jurassic World Fallen Kingdom.mkv"
+KEEP_STREAMS=(0:0 0:1 0:4)
+TRANSCODE_AUDIO=0:1

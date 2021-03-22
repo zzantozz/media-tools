@@ -1,0 +1,4 @@
+OUTPUTNAME="The Mummy Returns.mkv"
+KEEP_STREAMS=(0:0 0:1 0:3 0:4 0:5)
+FFMPEG_EXTRA_OPTIONS="-c:3 ac3 -b3 128k mess this up so i have to double check the dts express encoding"
+TRANSCODE_AUDIO=0:1
