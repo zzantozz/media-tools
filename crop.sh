@@ -51,6 +51,7 @@ TOTALLEN=$((CHECKLEN*STREAMCOUNT))
 CMD=(ffmpeg)
 CMD+=("${INPUTS[@]}")
 CMD+=(-filter_complex "$FILTER ${OUTPUTS}concat=n=$STREAMCOUNT,cropdetect=round=2")
+CMD+=(-max_muxing_queue_size 1024)
 CMD+=(-f null -t "$TOTALLEN" -)
 # For debugging to spit the concatted stream to a file
 #CMD+=(-filter_complex "$FILTER ${OUTPUTS}concat=n=$STREAMCOUNT[final]")
