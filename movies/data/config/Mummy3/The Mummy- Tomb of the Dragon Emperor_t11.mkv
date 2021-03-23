@@ -1,0 +1,4 @@
+OUTPUTNAME="The Mummy - Tomb of the Dragon Emperor.mkv"
+KEEP_STREAMS=(0:0 0:1 0:3 0:4 0:5 0:6)
+FFMPEG_EXTRA_OPTIONS="-c:2 ac3 -b:2 128k -c:4 ac3 -b:4 128k check me for correct dts express output"
+TRANSCODE_AUDIO=0:1
