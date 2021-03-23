@@ -46,11 +46,12 @@ else
 	[[ "$OUTPUTNAME" =~ ^$p/ ]] && MATCH=true
     done
     [ "$MATCH" = true ] || {
-	# If not in a Plex dir, it should be the main movie file, named the same as the movie directory
+	# If not in a Plex dir, it should be the main movie file, named similarly to the movie directory. With
+	# multiple cuts, the movie dir "Blah" could contain "Blah (Theatrical).mkv" and "Blah (Extended).mkv"
 	CONFIGDIR="$(dirname "$1")"
-	MAIN="$(cat "$CONFIGDIR/main" | tr -d '\n')"
-	EXPECTED="MOVIENAME=\"${OUTPUTNAME%.*}\""
-	[ "$MAIN" = "$EXPECTED" ] && MATCH=true
+	source "$CONFIGDIR/main"
+	BASE="${MOVIENAME%%.*}"
+	[[ "$OUTPUTNAME" =~ ^"$BASE".*\.mkv$ ]] && MATCH=true
     }
     [ "$MATCH" = true ] || {
 	echo "OUTPUTNAME doesn't match the movie name and doesn't put the output file in a known Plex dir:"
