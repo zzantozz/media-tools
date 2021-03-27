@@ -227,4 +227,4 @@ export -f encode_one
 
 [ $# -eq 1 ] && ONE=true
 [ "$ONE" = true ] && encode_one "$1"
-[ -z "$ONE" ] && find "$INPUTDIR" -name '*.mkv' -mmin +2 -print0 | xargs -0I {} bash -c 'encode_one "{}"'
+[ -z "$ONE" ] && find "$INPUTDIR" -name '*.mkv' -mmin +2 -print0 | sort -z | xargs -0I {} bash -c 'encode_one "{}"'
