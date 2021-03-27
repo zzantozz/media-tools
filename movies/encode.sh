@@ -79,22 +79,42 @@ function encode_one {
 	return 0
     }
     echo "Processing $PARTIALNAME into $PARTIALOUTPUT" >&2
-    # Let interlace value be set in config. Otherwise, figure it out.
-    [ -z "$INTERLACED" ] && INTERLACED=$("$TOOLSDIR/interlaced.sh" "$FULLPATH")
-    debug "Interlacing: $INTERLACED"
+    DUR=$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=DURATION-eng -of default=noprint_wrappers=1:nokey=1 "$FULLPATH" | cut -d '.' -f 1)
+    echo "Duration: $DUR"
+
+    # Let some values be set in config. Otherwise, figure them out.
+    [ -n "$INTERLACED" ] && CONFIG_INTERLACED="$INTERLACED"
+    [ -n "$CROPPING" ] && CONFIG_CROPPING="$CROPPING"
+
     VFILTERS=()
+    debug "Analyzing..."
+    debug " - $(date)"
+    ANALYSIS=$("$TOOLSDIR/analyze.sh" "$FULLPATH")
+    debug " - $(date)"
+    eval "$ANALYSIS"
+
+    [ -n "$CONFIG_INTERLACED" ] && [ "$CONFIG_INTERLACED" != "$INTERLACED" ] && {
+	echo "Config interlace value doesn't match detected interlace value." >&2
+	echo "Config  : $CONFIG_INTERLACED" >&2
+	echo "Detected: $INTERLACED" >&2
+	exit 1
+    }
+    [ -n "$CONFIG_CROPPING" ] && [ "$CONFIG_CROPPING" != "$CROPPING" ] && {
+	echo "Config cropping value doesn't match detected cropping value." >&2
+	echo "Config  : $CONFIG_CROPPING" >&2
+	echo "Detected: $CROPPING" >&2
+	exit 1
+    }
+
+    debug "Interlacing: $INTERLACED"
     [ "$INTERLACED" = interlaced ] && VFILTERS+=("yadif")
     [ "$INTERLACED" = progressive ] || [ "$INTERLACED" = interlaced ] || {
     	echo "Invalid interlace value: '$INTERLACED'" >&2
     	exit 1
     }
-    debug "Detect cropping..."
-    [ -n "$CROPPING" ] || CROPPING=$($TOOLSDIR/crop.sh "$FULLPATH") || {
-	echo "Crop detection failed" >&2
-	exit 1
-    }
     debug "Cropping: $CROPPING"
     [ -n "$CROPPING" ] && [ "$CROPPING" != none ] && VFILTERS+=("crop=$CROPPING")
+
     VQ=$("$TOOLSDIR/quality.sh" "$FULLPATH")
     debug "Quality: $VQ"
     [ "$QUALITY" = "rough" ] && {
@@ -182,10 +202,8 @@ function encode_one {
     for arg in "${CMD[@]}"; do
 	echo -n "\"${arg//\"/\\\"}\" "
     done
-    DUR=$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=DURATION-eng -of default=noprint_wrappers=1:nokey=1 "$FULLPATH" | cut -d '.' -f 1)
     echo "&> \"$LOGFILE\""
-    echo "Duration: $DUR"
-    echo "Start: $(date)"
+    echo " - $(date)"
     mkdir -p "$(dirname "$OUTPUT")"
     mkdir -p "$(dirname "$LOGFILE")"
     mkdir -p "$(dirname "$DONEFILE")"
@@ -194,7 +212,7 @@ function encode_one {
     else
 	"${CMD[@]}" &> "$LOGFILE"
     fi
-    echo "End  : $(date)"
+    echo " - $(date)"
     if "$TOOLSDIR/done.sh" "$PARTIALOUTPUT" "$LOGDIR"; then
 	mkdir -p "$(dirname "$DONEFILE")"
 	touch "$DONEFILE"
