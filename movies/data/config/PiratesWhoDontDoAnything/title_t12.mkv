@@ -1,3 +1,4 @@
 OUTPUTNAME="Featurettes/Pirate 101.mkv"
 KEEP_STREAMS=(0:0 0:1 0:2)
 FFMPEG_EXTRA_OPTIONS="-disposition:s:0 0"
+INTERLACED=interlaced
