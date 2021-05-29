@@ -1,0 +1,4 @@
+AS="1"
+AS_TRANSCODE="false"
+COPIES="1,2,3"
+CUT_STREAMS=("0:0" "0:1" 0:2 0:3)
