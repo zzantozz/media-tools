@@ -69,6 +69,10 @@ function encode_one {
 	echo "Missing config file: $CONFIGFILE" >&2
 	exit 1
     fi
+    [ -n "$OUTPUTNAME" ] || {
+	echo "No OUTPUTNAME set in config." >&2
+	exit 1
+    }
     [ -z "$MOVIENAME" ] && MOVIENAME="$(dirname "$PARTIALNAME")"
     PARTIALOUTPUT="$MOVIENAME/$OUTPUTNAME"
     DONEFILE="$DONEDIR/$PARTIALOUTPUT"
@@ -87,24 +91,28 @@ function encode_one {
     [ -n "$CROPPING" ] && CONFIG_CROPPING="$CROPPING"
 
     VFILTERS=()
-    debug "Analyzing..."
-    debug " - $(date)"
+    echo "Analyzing..."
+    echo " - $(date)"
     ANALYSIS=$("$TOOLSDIR/analyze.sh" "$FULLPATH")
-    debug " - $(date)"
+    echo " - $(date)"
     eval "$ANALYSIS"
 
-    [ -n "$CONFIG_INTERLACED" ] && [ "$CONFIG_INTERLACED" != "$INTERLACED" ] && {
+    [ -n "$CONFIG_INTERLACED" ] && [ -n "$INTERLACED" ] && [ "$CONFIG_INTERLACED" != "$INTERLACED" ] && {
 	echo "Config interlace value doesn't match detected interlace value." >&2
 	echo "Config  : $CONFIG_INTERLACED" >&2
 	echo "Detected: $INTERLACED" >&2
 	exit 1
     }
-    [ -n "$CONFIG_CROPPING" ] && [ "$CONFIG_CROPPING" != "$CROPPING" ] && {
+    INTERLACED="${CONFIG_INTERLACED:-$INTERLACED}"
+    [ -n "$CONFIG_CROPPING" ] && [ -n "$CROPPING" ] && [ "$CONFIG_CROPPING" != "$CROPPING" ] && {
 	echo "Config cropping value doesn't match detected cropping value." >&2
 	echo "Config  : $CONFIG_CROPPING" >&2
 	echo "Detected: $CROPPING" >&2
-	exit 1
+	# I want to abort here, but I found a movie where this is actually needed. Guns of Navarone detects a crop of 710:358:4:60, but
+	# makes the video all crazy stretched out. 710:360:4:60 works fine.
+	#exit 1
     }
+    CROPPING="${CONFIG_CROPPING:-$CROPPING}"
 
     debug "Interlacing: $INTERLACED"
     [ "$INTERLACED" = interlaced ] && VFILTERS+=("yadif")
@@ -113,7 +121,11 @@ function encode_one {
     	exit 1
     }
     debug "Cropping: $CROPPING"
-    [ -n "$CROPPING" ] && [ "$CROPPING" != none ] && VFILTERS+=("crop=$CROPPING")
+    [ -z "$CROPPING" ] && {
+	echo "No cropping determined. There should always be a value here." >&2
+	exit 1
+    }
+    [ "$CROPPING" = none ] || VFILTERS+=("crop=$CROPPING")
 
     VQ=$("$TOOLSDIR/quality.sh" "$FULLPATH")
     debug "Quality: $VQ"

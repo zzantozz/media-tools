@@ -115,14 +115,21 @@ MATCH=true
         exit 0
 }
 
-#    Stream #0:0(eng): Video: vc1 (Advanced) (WVC1 / 0x31435657), yuv420p(progressive), 1920x1080 [SAR 1:1 DAR 16:9], 23.98 fps, 23.98 tbr, 1k tbn, 47.95 tbc
-#    Stream #0:1(eng): Audio: dts (DTS-HD MA), 48000 Hz, 5.1(side), s32p (24 bit) (default)
-#    Stream #0:2(eng): Audio: dts (DTS), 48000 Hz, 5.1(side), fltp, 1536 kb/s
-#    Stream #0:3(eng): Audio: ac3, 48000 Hz, stereo, fltp, 192 kb/s
-#    Stream #0:4(eng): Audio: ac3, 48000 Hz, stereo, fltp, 192 kb/s
-#    Stream #0:5(eng): Subtitle: hdmv_pgs_subtitle, 1920x1080
-#    Stream #0:6: Video: mjpeg (Baseline), yuvj444p(pc, bt470bg/unknown/unknown), 640x360 [SAR 72:72 DAR 16:9], 90k tbr, 90k tbn, 90k tbc (attached pic)
+MATCH=true
+[ $LINES -eq 4 ] || MATCH=false
+[ "$DEBUG" = "profile" ] && echo $MATCH
+[[ $DATA =~ Stream\ #0:0.*(1920x1080) ]] || MATCH=false
+[ "$DEBUG" = "profile" ] && echo $MATCH
+[[ $DATA =~ Stream\ #0:1.*Audio:\ ac3.*stereo ]] || MATCH=false
+[ "$DEBUG" = "profile" ] && echo $MATCH
+[[ $DATA =~ Stream\ #0:2.*Subtitle ]] || MATCH=false
+[ "$DEBUG" = "profile" ] && echo $MATCH
+[[ $DATA =~ Stream\ #0:3:\ Video:\ mjpeg ]] || MATCH=false
+[ "$DEBUG" = "profile" ] && echo $MATCH
+[ $MATCH = true ] && {
+        echo "bsg-7"
+        exit 0
+}
 
 echo "No profile matched" >&2
 exit 1
-

@@ -15,12 +15,20 @@ MYDIR="$(dirname "$0")"
 TMP="$(mktemp)"
 TMPDIR="$(mktemp -d)"
 debug "Sampling input..."
-debug " -- $(date)"
+debug " - $(date)"
 $MYDIR/sample.sh "$1" 30 | ffmpeg -y -i pipe: -filter 'idet,cropdetect=round=2' -f null /dev/null &> "$TMP"
-debug " -- $(date)"
+debug " - $(date)"
 
-INTERLACED=$("$MYDIR/interlaced.sh" -i "$TMP" -f output)
-CROPPING=$("$MYDIR/crop.sh" -i "$TMP" -f output)
+INTERLACED=$("$MYDIR/interlaced.sh" -i "$TMP" -f output) && {
+    debug "Interlaced: $INTERLACED"
+    echo "INTERLACED=$INTERLACED"
+} || {
+    debug "Interlace detection failed, but continuing, since it could be set manually"
+}
+CROPPING=$("$MYDIR/crop.sh" -i "$TMP" -f output) && {
+    debug "Cropping: $CROPPING"
+    echo "CROPPING=$CROPPING"
+} || {
+    debug "Crop detect failed, but continuing, since it could be set manually"
+}
 rm "$TMP"
-echo "INTERLACED=$INTERLACED"
-echo "CROPPING=$CROPPING"

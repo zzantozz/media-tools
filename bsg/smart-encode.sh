@@ -13,11 +13,14 @@ mkdir -p "$LOGDIR"
 RIPPING="/media/plex-media-2/ripping"
 export RIPPING
 
-export DONES=$(ls "$DONEDIR")
-
 # List of outputs to build the map values from in the function. Can't be an array because those can't be exported.
 OUTSTRING="[outa] [outb] [outc] [outd] [oute] [outf] [outg] [outh] [outi] [outj] [outkl] [outm] [outn] [outo] [outp] [outq]"
 export OUTSTRING
+
+function debug {
+    [ "$DEBUG" = encode ] && echo "$1" >&2
+}
+export -f debug
 
 function encode_one {
     [ -f "$1" ] || {
@@ -26,36 +29,46 @@ function encode_one {
     }
     set -e
     NEXT="$1"
-    BASENAME=$(basename "$NEXT")
+    BASENAME="$(basename "$NEXT")"
+    DIRNAME="$(basename "$(dirname "$NEXT")")"
+    CONFIGFILE="data/config/$DIRNAME/$BASENAME"
+    debug "Using $CONFIGFILE"
+    if [ -f "$CONFIGFILE" ]; then
+	source "$CONFIGFILE"
+	[ -n "$SEASON" ] || {
+	    echo "Config didn't specify a SEASON" >&2
+	    exit 1
+	}
+	[ -n "$EPISODE" ] || {
+	    echo "Config didn't specify an EPISODE" >&2
+	    exit 1
+	}
+	S2=$(printf "%0.2d" "$SEASON")
+	EPISODE=$(printf "%0.2d" "$EPISODE")
+	OUTPUTNAME="Season $SEASON/Battlestar Galactica s${S2}e${EPISODE}"
+	[ -n "$DESCRIPTION" ] && OUTPUTNAME="$OUTPUTNAME - $DESCRIPTION"
+	OUTPUTNAME="$OUTPUTNAME.mkv"
+	DONEFILE="$DONEDIR/$OUTPUTNAME"
+    else
+	SEASON=$("$RIPPING/season.sh" "$NEXT")
+	OUTPUTNAME="Season $SEASON/$BASENAME"
+	DONEFILE="$DONEDIR/$BASENAME"
+    fi
     DONE=false
-    echo "$DONES" | grep "$BASENAME" > /dev/null && DONE=true
+    [ -f "$DONEFILE" ] && DONE=true
     [ "$ONE" != "true" ] && [ $DONE = true ] && {
-	[ "$DEBUG" = "encode" ] && echo "$BASENAME is done"
+	debug "Done: $DIRNAME/$BASENAME"
 	return 0
     }
-    echo "Processing $BASENAME"
-    INTERLACED=$(./interlaced.sh "$NEXT")
+    echo "Processing $DIRNAME/$BASENAME into $OUTPUTNAME"
+    INTERLACED=$(../interlaced.sh -i "$NEXT" -f video)
     [ "$DEBUG" = "encode" ] && echo "Interlacing=$INTERLACED"
-    [ $INTERLACED = interlaced ] && {
-	echo "Interlaced video handling disabled because I'm not sure how to make it work"
-	echo "with the -filter_complex. If this comes up, gotta figure out how to add the"
-	echo "yadif filter to it. Also don't use the name FILTER here. It's used later."
-	exit 1
-    }
-    #FILTER=unset
-    #[ $INTERLACED = interlaced ] && FILTER="-filter:v:0 yadif"
-    #[ $INTERLACED = progressive ] && FILTER=""
-    #[ "$FILTER" = "unset" ] && {
-    #	echo "Invalid interlace value: '$INTERLACED'"
-    #	exit 1
-    #}
     VQ=$("$RIPPING/quality.sh" "$NEXT")
-    SEASON=$("$RIPPING/season.sh" "$NEXT")
     INPUT="$NEXT"
     [ "$QUALITY" = "rough" ] && {
 	OUTPUT="/media/plex-media-2/ripping/bsg-editing/test-encode-$BASENAME"
     } || {
-	OUTPUT="/media/plex-media/tv-shows/Battlestar Galactica (2003)/Season $SEASON/$BASENAME"
+	OUTPUT="/media/plex-media/tv-shows/Battlestar Galactica (2003)/$OUTPUTNAME"
     }
     PROFILE=$(./profile.sh "$NEXT")
     PROFILECONFIGFILE="./data/profiles/$PROFILE"
@@ -69,6 +82,20 @@ function encode_one {
     source "$PROFILECONFIGFILE"
     FILTER=$(./filter.sh "$NEXT")
     [ "$DEBUG" = "encode" ] && echo "Filter: $FILTER"
+    if [ "$INTERLACED" = interlaced ] && [ -n "$FILTER" ]; then
+	echo "Interlaced video handling disabled because I'm not sure how to make it work"
+	echo "with the -filter_complex. If this comes up, gotta figure out how to add the"
+	echo "yadif filter to it. Also stop using the name FILTER. It's used for both the"
+	echo "filter_complex value and the yadif filter string. Make the live together."
+	exit 1
+    fi
+    SIMPLEFILTER=unset
+    [ $INTERLACED = interlaced ] && SIMPLEFILTER="yadif"
+    [ $INTERLACED = progressive ] && SIMPLEFILTER=""
+    [ "$SIMPLEFILTER" = "unset" ] && {
+    	echo "Invalid interlace value: '$INTERLACED'"
+	exit 1
+    }
     [ -n "$CUT_STREAMS" ] || {
 	echo "CUT_STREAMS should be known by now"
 	exit 1
@@ -94,7 +121,9 @@ function encode_one {
     #CMD=(docker run --rm -v "$RIPPING":"$RIPPING" -v "$SHOWS":"$SHOWS" -w "$(pwd)" jrottenberg/ffmpeg -stats)
     CMD+=(-hide_banner -y -i "$NEXT")
     [ -z "$FILTER" ] || CMD+=(-filter_complex "$FILTER")
+    [ -z "$SIMPLEFILTER" ] || CMD+=(-filter:0 "$SIMPLEFILTER")
     CMD+=($MAPS)
+    CMD+=(-c copy)
     # Do real video encoding, or speed encode for checking the output?
     [ "$QUALITY" = "rough" ] && {
 	#CMD+=(-c:0 mpeg2video -threads:0 2)
@@ -102,11 +131,19 @@ function encode_one {
     } || {
 	CMD+=(-c:0 libx265 -crf:0 20)
     }
-    CMD+=(-c:1 ac3 -ac:1 6 -b:1 384k)
-    # when there's a second audio stream, it's a stereo commentary stream
+    if [ "$AS_TRANSCODE" = true ] && [ "$AS" = 1 ]; then
+	CMD+=(-c:1 ac3 -ac:1 6 -b:1 384k)
+	CMD+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
+    elif [ "$AS_TRANSCODE" = false ] && [ "$AS" = 1 ]; then
+	CMD+=()
+    else
+	echo "Don't know how to deal with AS_TRANSCODE=$AS_TRANSCODE and AS=$AS" >&2
+	exit 1
+    fi
+    # when there's a second audio stream, it's a stereo commentary stream, but we have to transcode
+    # because of the cutting
     CMD+=(-c:2 ac3 -ac:2 2 -b:2 192k)
     CMD+=(-metadata:s:0 "encoded_by=My smart encoder script")
-    CMD+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
     CMD+=("$OUTPUT")
 
     for arg in "${CMD[@]}"; do
@@ -116,11 +153,15 @@ function encode_one {
     date
     "${CMD[@]}" &> "$LOGDIR/$BASENAME.log"
     date
-    "$RIPPING/done.sh" "$NEXT" "$LOGDIR" && touch "$DONEDIR/$BASENAME" || {
-	    echo ""
-	    echo "Encoding not done?"
-	    exit 1
-	}
+    if "$RIPPING/done.sh" "$NEXT" "$LOGDIR"; then
+	mkdir -p "$(dirname "$DONEFILE")"
+	debug "All done: touch '$DONEFILE'"
+        touch "$DONEFILE"
+    else
+	echo ""
+	echo "Encoding not done?"
+	exit 1
+    fi
     echo ""
 }
 export -f encode_one

@@ -9,6 +9,12 @@ the entire series" script. That means it has to know how to encode
 every single file ripped from the blurays and that when a file is
 done, it doesn't try to process it again.
 
+NOTE: The files this deals with had already been named according to
+season and episode! The script doesn't actually deal with the raw,
+ripped files. Maybe I could figure out the translation between the two
+by ripping them all again and running checksums against both sets of
+files.
+
 To accomplish this, the script generally does the following things:
 
 1. Scans a directory for all raw mkv's ripped from the BSG blurays.

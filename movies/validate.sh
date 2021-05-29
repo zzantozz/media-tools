@@ -18,7 +18,7 @@ VALIDS=(
 
 while read -r line; do
     key="${line%%=*}"
-    [[ "${VALIDS[@]}" =~ $key ]] || {
+    [[ "${VALIDS[@]}" =~ $key ]] || [[ "$key" =~ ^# ]] || {
 	echo "Invalid key: $key"
 	exit 1
     }
@@ -72,8 +72,9 @@ else
 	echo "KEEP_STREAMS should be an array with more than one thing in it"
 	exit 1
     }
-    [ -z "$CROPPING" ] || [ "$CROPPING" = none ] || [[ "$CROPPING" =~ ^crop= ]] || {
-	echo "CROPPING should be set to 'none' or a 'crop=...' value"
+    D=[[:digit:]]
+    [ -z "$CROPPING" ] || [ "$CROPPING" = none ] || [[ "$CROPPING" =~ ^$D+:$D+:$D+:$D+ ]] || {
+	echo "CROPPING should be set to 'none' or a valid cropping value like 1900:800:10:120"
 	exit 1
     }
 fi

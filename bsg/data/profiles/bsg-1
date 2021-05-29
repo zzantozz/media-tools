@@ -1,3 +1,5 @@
 AS="1"
 AS_TRANSCODE="false"
 COPIES="2,3"
+# 0:3 is probably subtitles. expect this to fail. just added it because i'm not sure
+CUT_STREAMS=(0:0 0:1 0:2 0:3)

@@ -99,15 +99,18 @@ debug "tff: $TFF1 bff: $BFF1 progressive: $PROG1 undetermined: $UNDET1"
 }
 debug "tff: $TFF2 bff: $BFF2 prog: $PROG2 undetermined: $UNDET2"
 
-VALUES="Single frame: tff=$TFF1 bff=$BFF1 progressive=$PROG1 undetermined=$UNDET1\nDouble frame: tff=$TFF2 bff=$BFF2 prog=$PROG2 undetermined=$UNDET2"
+VALUES="Single frame: tff=$TFF1 bff=$BFF1 progressive=$PROG1 undetermined=$UNDET1\nDouble frame: tff=$TFF2 bff=$BFF2 progressive=$PROG2 undetermined=$UNDET2"
 
-# If undetermined is the highest number, abort
-[ $UNDET1 -gt $TFF1 ] && [ $UNDET1 -gt $BFF1 ] && [ $UNDET1 -gt $PROG1 ] && {
+[ $((10*(TFF1+BFF1))) -lt $PROG1 ] && ANSWER1=progressive
+[ $((10*(TFF2+BFF2))) -lt $PROG2 ] && ANSWER2=progressive
+
+# If nothing has worked yet and undetermined is the highest number, abort
+[ -z "$ANSWER1" ] && [ $UNDET1 -gt $TFF1 ] && [ $UNDET1 -gt $BFF1 ] && [ $UNDET1 -gt $PROG1 ] && {
     echo "Single frame detection was undetermined" >&2
     echo -e "$VALUES" >&2
     exit 1
 }
-[ $UNDET2 -gt $TFF2 ] && [ $UNDET2 -gt $BFF2 ] && [ $UNDET2 -gt $PROG2 ] && {
+[ -z "$ANSWER2" ] && [ $UNDET2 -gt $TFF2 ] && [ $UNDET2 -gt $BFF2 ] && [ $UNDET2 -gt $PROG2 ] && {
     echo "Multi frame detection was undetermined" >&2
     echo -e "$VALUES" >&2
     exit 1
@@ -123,4 +126,6 @@ VALUES="Single frame: tff=$TFF1 bff=$BFF1 progressive=$PROG1 undetermined=$UNDET
     echo -e "$VALUES" >&2
     exit 1
 }
+mkdir -p "$(dirname "$CACHEFILE")"
+echo "$ANSWER1" > "$CACHEFILE" || true
 echo $ANSWER1
