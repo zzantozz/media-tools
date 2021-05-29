@@ -1,0 +1,4 @@
+OUTPUTNAME="Revenge of the Pink Panther.mkv"
+KEEP_STREAMS=(0:0 0:1 0:7 0:9)
+TRANSCODE_AUDIO=0:1
+FFMPEG_EXTRA_OPTIONS="-c:2 ac3 -b:2 128k"

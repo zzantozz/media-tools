@@ -1,0 +1,7 @@
+OUTPUTNAME="The Guns of Navarone.mkv"
+KEEP_STREAMS=(0:0 0:2 0:1 0:3 0:5)
+FFMPEG_EXTRA_OPTIONS="-disposition:a:0 default -disposition:a:1 0"
+# Best detected cropping is 710:358:4:60, but that makes the video really messed up,
+# like its width has been compressed to about 20 pixels. I assume it has to do with
+# some kind of rounding. This makes it work.
+CROPPING="710:360:4:60"

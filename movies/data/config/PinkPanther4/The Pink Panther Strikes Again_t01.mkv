@@ -1,0 +1,4 @@
+OUTPUTNAME="The Pink Panther Strikes Again.mkv"
+KEEP_STREAMS=(0:0 0:1 0:7 0:9)
+TRANSCODE_AUDIO=0:1
+FFMPEG_EXTRA_OPTIONS="-c:3 ac3 -b:3 128k"

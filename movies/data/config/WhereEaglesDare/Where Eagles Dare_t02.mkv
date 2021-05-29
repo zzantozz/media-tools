@@ -1,0 +1,4 @@
+OUTPUTNAME="Where Eagles Dare.mkv"
+KEEP_STREAMS=(0:0 0:1 0:3)
+TRANSCODE_AUDIO=0:1
+FFMPEG_EXTRA_OPTIONS="-disposition:a:0 0"

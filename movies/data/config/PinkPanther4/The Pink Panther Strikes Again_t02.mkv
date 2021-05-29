@@ -1,0 +1,3 @@
+OUTPUTNAME="Featurettes/Panther Musings - A Life in Films.mkv"
+KEEP_STREAMS=(0:0 0:1)
+TRANSCODE_AUDIO=0:1

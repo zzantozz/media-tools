@@ -1,0 +1,3 @@
+OUTPUTNAME="Featurettes/A Cut Above - Editing the Pink Panther Films.mkv"
+KEEP_STREAMS=(0:0 0:1)
+TRANSCODE_AUDIO=0:1
