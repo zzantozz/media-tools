@@ -77,6 +77,7 @@ function encode_one {
     PARTIALOUTPUT="$MOVIENAME/$OUTPUTNAME"
     DONEFILE="$DONEDIR/$PARTIALOUTPUT"
     DONE=false
+    debug "Looking for done file $DONEFILE"
     [ -f "$DONEFILE" ] && DONE=true
     [ "$ONE" != "true" ] && [ $DONE = true ] && {
 	echo "Done: $PARTIALNAME -> $PARTIALOUTPUT" >&2
@@ -90,12 +91,13 @@ function encode_one {
     [ -n "$INTERLACED" ] && CONFIG_INTERLACED="$INTERLACED"
     [ -n "$CROPPING" ] && CONFIG_CROPPING="$CROPPING"
 
-    VFILTERS=()
-    echo "Analyzing..."
-    echo " - $(date)"
-    ANALYSIS=$("$TOOLSDIR/analyze.sh" "$FULLPATH")
-    echo " - $(date)"
-    eval "$ANALYSIS"
+    if [ -z "$CONFIG_INTERLACED" ] || [ -z "$CONFIG_CROPPING" ]; then
+	echo "Analyzing..."
+	echo " - $(date)"
+	ANALYSIS=$("$TOOLSDIR/analyze.sh" "$FULLPATH")
+	echo " - $(date)"
+	eval "$ANALYSIS"
+    fi
 
     [ -n "$CONFIG_INTERLACED" ] && [ -n "$INTERLACED" ] && [ "$CONFIG_INTERLACED" != "$INTERLACED" ] && {
 	echo "Config interlace value doesn't match detected interlace value." >&2
@@ -115,6 +117,7 @@ function encode_one {
     CROPPING="${CONFIG_CROPPING:-$CROPPING}"
 
     debug "Interlacing: $INTERLACED"
+    VFILTERS=()
     [ "$INTERLACED" = interlaced ] && VFILTERS+=("yadif")
     [ "$INTERLACED" = progressive ] || [ "$INTERLACED" = interlaced ] || {
     	echo "Invalid interlace value: '$INTERLACED'" >&2
@@ -125,7 +128,8 @@ function encode_one {
 	echo "No cropping determined. There should always be a value here." >&2
 	exit 1
     }
-    [ "$CROPPING" = none ] || VFILTERS+=("crop=$CROPPING")
+    # Possibly handled in complex filter later
+    #[ "$CROPPING" = none ] || VFILTERS+=("crop=$CROPPING")
 
     VQ=$("$TOOLSDIR/quality.sh" "$FULLPATH")
     debug "Quality: $VQ"
@@ -140,37 +144,43 @@ function encode_one {
 	OUTPUT="$MOVIESDIR/$PARTIALOUTPUT"
     }
     if [ -f "data/cuts/$PARTIALNAME" ]; then
-	echo "Video cutting with complex_filter not yet implemented here" >&2
-	COMPLEXFILTER=$("$TOOLSDIR/filter.sh" "$NEXT")
+	FILTERCMD=("./filter.sh" "$FULLPATH")
+	[ "$CROPPING" = none ] || FILTERCMD+=(-v "crop=$CROPPING")
+	COMPLEXFILTER=$("${FILTERCMD[@]}") || {
+	    echo "filter.sh failed to determine complex filter string" >&2
+	    exit 1
+	}
 	debug "complex_filter: $COMPLEXFILTER"
-	exit 1
     else
 	COMPLEXFILTER=""
+        [ "$CROPPING" = none ] || VFILTERS+=("crop=$CROPPING")
     fi
-    [ "${#VFILTERS[@]}" -gt 0 ] && [ -n "$COMPLEXFILTER" ] && {
-	echo "Video has filtering from here and also has a" >&2
-	echo "complex_filter generated for it. If this comes up, gotta" >&2
-	echo "figure out how to apply both filters at the same time." >&2
+    [ "$INTERLACED" = "interlaced" ] && [ -n "$COMPLEXFILTER" ] && {
+	echo "Video has complex filtering and needs de-interlacing." >&2
+	echo "This isn't yet supported by filter.sh, but you should just" >&2
+	echo "need to pass it as an extra video filter." >&2
 	exit 1
     }
     [ -n "$KEEP_STREAMS" ] || {
-	echo "KEEP_STREAMS should be known by now"
+	echo "KEEP_STREAMS should be known by now" >&2
 	exit 1
     }
     MAPS=""
-    [ -n "$COMPLEXFILTER" ] && {
-	NMAPS="${#KEEP_STREAMS[@]}"
+    if [ -n "$COMPLEXFILTER" ]; then
+	debug "have complex filter; mapping this way"
+	NMAPS="${#CUT_STREAMS[@]}"
 	NMAPS=$((NMAPS-1))
 	ALLOUTS=($OUTSTRING)
 	for I in $(seq 0 $NMAPS); do
 	    MAPS="$MAPS -map ${ALLOUTS[$I]}"
 	done
-    } || {
+    else
+	debug "no complex filter; mapping that way"
 	STREAMS="${KEEP_STREAMS[@]}"
 	for S in $STREAMS; do
 	    MAPS="$MAPS -map $S"
 	done
-    }
+    fi
     [ -n "$TRANSCODE_AUDIO" ] && {
 	MAPS="${MAPS# -map 0:0}"
 	MAPS="-map 0:0 -map $TRANSCODE_AUDIO $MAPS"
@@ -200,6 +210,11 @@ function encode_one {
 	CMD+=(-c:0 libx265 -crf:0 "$VQ")
     }
     [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ] && {
+	CMD+=(-c:1 ac3 -ac:1 6 -b:1 384k)
+    }
+    # If cutting is happening, stream 1 should be the best audio for the purpose and has to be transcoded
+    # due to the cutting.
+    [ -n "$COMPLEXFILTER" ] && {
 	CMD+=(-c:1 ac3 -ac:1 6 -b:1 384k)
     }
     CMD+=(-metadata:s:0 "encoded_by=My smart encoder script")
