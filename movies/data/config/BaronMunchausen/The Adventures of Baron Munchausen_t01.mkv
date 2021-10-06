@@ -1,0 +1,6 @@
+OUTPUTNAME="The Adventures of Baron Munchausen.mkv"
+KEEP_STREAMS=(0:0 0:1 0:3)
+CUT_STREAMS=(0:0 0:1 0:3)
+FFMPEG_EXTRA_OPTIONS="-c:2 ac3 -ac:2 2 -b:2 128k"
+INTERLACED=progressive
+CROPPING=1920:1040:0:20

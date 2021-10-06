@@ -1,0 +1,4 @@
+OUTPUTNAME="Captain Ron.mkv"
+KEEP_STREAMS=(0:0 0:1)
+CUT_STREAMS=(0:0 0:1)
+FFMPEG_EXTRA_OPTIONS="-disposition:s:0 0"
