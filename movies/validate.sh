@@ -22,6 +22,11 @@ while read -r line; do
     key="${line%%=*}"
     [[ "${VALIDS[@]}" =~ $key ]] || [[ "$key" =~ ^# ]] || {
 	echo "Invalid key: $key"
+	echo "Acceptable keys are:"
+	echo -n "  "
+	for p in "${VALIDS[@]}"; do
+	    echo -n "\"$p\" "
+	done
 	exit 1
     }
 done < "$1"
@@ -54,6 +59,11 @@ else
 	source "$CONFIGDIR/main"
 	BASE="${MOVIENAME%%.*}"
 	[[ "$OUTPUTNAME" =~ ^"$BASE".*\.mkv$ ]] && MATCH=true
+    }
+    [ "$MATCH" = true ] || {
+	# Also, as a special case, Marvel One-Shots can be moved to the top level. They're included as special
+	# features on some discs but recognized as movies in their own right.
+        [[ "$OUTPUTNAME" =~ ^Marvel\ One-Shot: ]] && MATCH=true
     }
     [ "$MATCH" = true ] || {
 	echo "OUTPUTNAME doesn't match the movie name and doesn't put the output file in a known Plex dir:"
