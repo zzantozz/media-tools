@@ -1,0 +1,4 @@
+OUTPUTNAME="X-Men 3.mkv"
+KEEP_STREAMS=(0:0 0:1 0:3 0:4 0:5)
+CUT_STREAMS=(0:0 0:1 0:3 0:4 0:5)
+FFMPEG_EXTRA_OPTIONS="-disposition:a:2 0 -c:2 ac3 -ac:2 6 -b:2 384k -c:3 ac3 -ac:3 6 -b:3 384k -c:4 ac3 -ac:4 2 -b:4 128k -c:5 ac3 -ac:5 2 -b:5 128k"

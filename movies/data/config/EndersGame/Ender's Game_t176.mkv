@@ -1,0 +1,2 @@
+OUTPUTNAME="Ender's Game.mkv"
+KEEP_STREAMS=(0:0 0:1 0:5 0:6 0:7)

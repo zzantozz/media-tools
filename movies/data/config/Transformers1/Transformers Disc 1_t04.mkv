@@ -1,0 +1,4 @@
+OUTPUTNAME="Transformers (2007).mkv"
+KEEP_STREAMS=(0:0 0:1 0:4 0:5 0:6 0:7 0:8)
+CUT_STREAMS=(0:0 0:1 0:4)
+FFMPEG_EXTRA_OPTIONS="-c:2 ac3 -ac:3 2 -b:3 128k"

@@ -1,0 +1,4 @@
+OUTPUTNAME="Men In Black 2.mkv"
+KEEP_STREAMS=(0:0 0:1 0:3 0:5)
+CUT_STREAMS=(0:0 0:1 0:3)
+FFMPEG_EXTRA_OPTIONS="-c:2 ac3 -ac:2 2 -b:2 128k"
