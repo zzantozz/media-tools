@@ -103,7 +103,7 @@ function encode_one {
 	echo "Config interlace value doesn't match detected interlace value." >&2
 	echo "Config  : $CONFIG_INTERLACED" >&2
 	echo "Detected: $INTERLACED" >&2
-	exit 1
+	echo "Using configured value" >&2
     }
     INTERLACED="${CONFIG_INTERLACED:-$INTERLACED}"
     [ -n "$CONFIG_CROPPING" ] && [ -n "$CROPPING" ] && [ "$CONFIG_CROPPING" != "$CROPPING" ] && {
@@ -118,18 +118,17 @@ function encode_one {
 
     debug "Interlacing: $INTERLACED"
     VFILTERS=()
-    [ "$INTERLACED" = interlaced ] && VFILTERS+=("yadif")
     [ "$INTERLACED" = progressive ] || [ "$INTERLACED" = interlaced ] || {
     	echo "Invalid interlace value: '$INTERLACED'" >&2
     	exit 1
     }
+    [ "$INTERLACED" = interlaced ] && VFILTERS+=("yadif")
     debug "Cropping: $CROPPING"
     [ -z "$CROPPING" ] && {
 	echo "No cropping determined. There should always be a value here." >&2
 	exit 1
     }
-    # Possibly handled in complex filter later
-    #[ "$CROPPING" = none ] || VFILTERS+=("crop=$CROPPING")
+    [ "$CROPPING" = none ] || VFILTERS+=("crop=$CROPPING")
 
     VQ=$("$TOOLSDIR/quality.sh" "$FULLPATH")
     debug "Quality: $VQ"
@@ -145,22 +144,16 @@ function encode_one {
     }
     if [ -f "data/cuts/$PARTIALNAME" ]; then
 	FILTERCMD=("./filter.sh" "$FULLPATH")
-	[ "$CROPPING" = none ] || FILTERCMD+=(-v "crop=$CROPPING")
+	EXTRAS=()
+	[ "$INTERLACED" = "interlaced" ] && EXTRAS+=("yadif")
+	[ "$CROPPING" = none ] || EXTRAS+=("crop=$CROPPING")
+	[ -n "$EXTRAS" ] && FILTERCMD+=(-v "$(IFS=,; printf "%s" "${EXTRAS[*]}")")
 	COMPLEXFILTER=$("${FILTERCMD[@]}") || {
 	    echo "filter.sh failed to determine complex filter string" >&2
 	    exit 1
 	}
 	debug "complex_filter: $COMPLEXFILTER"
-    else
-	COMPLEXFILTER=""
-        [ "$CROPPING" = none ] || VFILTERS+=("crop=$CROPPING")
     fi
-    [ "$INTERLACED" = "interlaced" ] && [ -n "$COMPLEXFILTER" ] && {
-	echo "Video has complex filtering and needs de-interlacing." >&2
-	echo "This isn't yet supported by filter.sh, but you should just" >&2
-	echo "need to pass it as an extra video filter." >&2
-	exit 1
-    }
     [ -n "$KEEP_STREAMS" ] || {
 	echo "KEEP_STREAMS should be known by now" >&2
 	exit 1
@@ -192,16 +185,32 @@ function encode_one {
 	VFILTERSTRING="$VFILTERSTRING,${VFILTERS[$i]}"
 	i=$((i+1))
     done
+
+    if [ -n "$COMPLEXFILTER" ] && [ -n "$VFILTERSTRING" ]; then
+	echo "I came up with both a complex filter and a simple filter string." >&2
+	echo "This is an error because you can't use both filter_complex and" >&2
+	echo "-filter:v in ffmpeg. See how we got here." >&2
+	echo "Simple filter string : $VFILTERSTRING" >&2
+	echo "Complex filter string: $COMPLEXFILTER" >&2
+	exit 1
+    fi
+
     # Use locally installed ffmpeg, or a docker container?
     CMD=(ffmpeg)
     #CMD=(docker run --rm -v "$TOOLSDIR":"$TOOLSDIR" -v "$MOVIESDIR":"$MOVIESDIR" -w "$(pwd)" jrottenberg/ffmpeg -stats)
+
     CMD+=(-hide_banner -y -i "$FULLPATH")
+
     # This because several videos end up failing with the "Too many packets buffered for output stream XXX" error.
     # I don't think this will cause any problems.
     CMD+=(-max_muxing_queue_size 1024)
+
+    # Use one filter or the other, if set. Setting both will cause an error, but that's checked earlier, and even if it's not,
+    # ffmpeg will tell you what you did wrong.
     [ -z "$COMPLEXFILTER" ] || CMD+=(-filter_complex "$COMPLEXFILTER")
     CMD+=($MAPS -c copy)
     [ -n "$VFILTERSTRING" ] && CMD+=("-filter:v:0" "$VFILTERSTRING")
+
     # Do real video encoding, or speed encode for checking the output?
     [ "$QUALITY" = "rough" ] && {
 	#CMD+=(-c:0 mpeg2video -threads:0 2)
@@ -212,11 +221,13 @@ function encode_one {
     [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ] && {
 	CMD+=(-c:1 ac3 -ac:1 6 -b:1 384k)
     }
+
     # If cutting is happening, stream 1 should be the best audio for the purpose and has to be transcoded
     # due to the cutting.
     [ -n "$COMPLEXFILTER" ] && {
 	CMD+=(-c:1 ac3 -ac:1 6 -b:1 384k)
     }
+
     CMD+=(-metadata:s:0 "encoded_by=My smart encoder script")
     [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ] && {
 	CMD+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
@@ -240,9 +251,15 @@ function encode_one {
 	"${CMD[@]}" &> "$LOGFILE"
     fi
     echo " - $(date)"
-    if "$TOOLSDIR/done.sh" "$PARTIALOUTPUT" "$LOGDIR"; then
-	mkdir -p "$(dirname "$DONEFILE")"
-	touch "$DONEFILE"
+
+    if [ "$QUALITY" = "rough" ]; then
+        echo "Rough encode done, not marking file as done done."
+    elif [ -n "$DRYRUN" ]; then
+        echo "Dry run, not marking file as done done."
+    elif "$TOOLSDIR/done.sh" "$PARTIALOUTPUT" "$LOGDIR"; then
+        echo "Marking file as done done."
+        mkdir -p "$(dirname "$DONEFILE")"
+        touch "$DONEFILE"
     else
 	echo ""
 	echo "Encoding not done?"
