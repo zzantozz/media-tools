@@ -76,7 +76,7 @@ debug "Cuts file format: $FORMAT"
         exit 1
 }
 
-debug "Cuts to make:\n${TIMESTAMPS[@]}"
+debug "Cuts to make:\n${TIMESTAMPS[*]}"
 
 CONFIGFILE="data/config/$MOVIEDIR/$BASENAME"
 debug "Using config file $CONFIGFILE"
@@ -118,7 +118,7 @@ function add_frames {
 	s="10#$s"
 	f="10#$f"
 	FULL_SECS=$((h*3600 + m*60 + s))
-	debug "h=$h m=$m s=$s f=$f FULL_SECS=$FULLSECS arg2=$2"
+	debug "h=$h m=$m s=$s f=$f FULL_SECS=$FULL_SECS add_frames=$2"
 	f=$((f + $2))
 	HIGHESTFRAME=$(printf "%.0f" "$FRAMERATE")
 	debug " ***** highest frame = $HIGHESTFRAME (rate = $FRAMERATE)"
