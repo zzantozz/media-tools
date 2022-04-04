@@ -115,20 +115,16 @@ function encode_one {
 	#exit 1
     }
     CROPPING="${CONFIG_CROPPING:-$CROPPING}"
-
     debug "Interlacing: $INTERLACED"
-    VFILTERS=()
     [ "$INTERLACED" = progressive ] || [ "$INTERLACED" = interlaced ] || {
     	echo "Invalid interlace value: '$INTERLACED'" >&2
     	exit 1
     }
-    [ "$INTERLACED" = interlaced ] && VFILTERS+=("yadif")
     debug "Cropping: $CROPPING"
     [ -z "$CROPPING" ] && {
 	echo "No cropping determined. There should always be a value here." >&2
 	exit 1
     }
-    [ "$CROPPING" = none ] || VFILTERS+=("crop=$CROPPING")
 
     VQ=$("$TOOLSDIR/quality.sh" "$FULLPATH")
     debug "Quality: $VQ"
@@ -153,6 +149,10 @@ function encode_one {
 	    exit 1
 	}
 	debug "complex_filter: $COMPLEXFILTER"
+    else
+        VFILTERS=()
+        [ "$INTERLACED" = interlaced ] && VFILTERS+=("yadif")
+        [ "$CROPPING" = none ] || VFILTERS+=("crop=$CROPPING")
     fi
     [ -n "$KEEP_STREAMS" ] || {
 	echo "KEEP_STREAMS should be known by now" >&2
