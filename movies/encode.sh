@@ -69,16 +69,30 @@ function encode_one {
 	echo "Missing config file: $CONFIGFILE" >&2
 	exit 1
     fi
+
+    # Figure out what our output file is
     [ -n "$OUTPUTNAME" ] || {
 	echo "No OUTPUTNAME set in config." >&2
 	exit 1
     }
     [ -z "$MOVIENAME" ] && MOVIENAME="$(dirname "$PARTIALNAME")"
     PARTIALOUTPUT="$MOVIENAME/$OUTPUTNAME"
+    [ "$QUALITY" = "rough" ] && {
+	OUTPUT="$TOOLSDIR/test-encode-$(basename "$PARTIALOUTPUT")"
+    } || {
+	[ -n "$OUTPUTNAME" ] || {
+	    echo "OUTPUTNAME not set in config: $CONFIGFILE" >&2
+	    exit 1
+	}
+	# Let movie name be set in config
+	OUTPUT="$MOVIESDIR/$PARTIALOUTPUT"
+    }
+
     DONEFILE="$DONEDIR/$PARTIALOUTPUT"
     DONE=false
-    debug "Looking for done file $DONEFILE"
+    debug "Check if already done; done file: $DONEFILE"
     [ -f "$DONEFILE" ] && DONE=true
+    [ ! -f "$OUTPUT" ] && DONE=false
     [ "$ONE" != "true" ] && [ $DONE = true ] && {
 	echo "Done: $PARTIALNAME -> $PARTIALOUTPUT" >&2
 	return 0
@@ -128,16 +142,7 @@ function encode_one {
 
     VQ=$("$TOOLSDIR/quality.sh" "$FULLPATH")
     debug "Quality: $VQ"
-    [ "$QUALITY" = "rough" ] && {
-	OUTPUT="$TOOLSDIR/test-encode-$(basename "$PARTIALOUTPUT")"
-    } || {
-	[ -n "$OUTPUTNAME" ] || {
-	    echo "OUTPUTNAME not set in config: $CONFIGFILE" >&2
-	    exit 1
-	}
-	# Let movie name be set in config
-	OUTPUT="$MOVIESDIR/$PARTIALOUTPUT"
-    }
+
     if [ -f "data/cuts/$PARTIALNAME" ]; then
 	FILTERCMD=("./filter.sh" "$FULLPATH")
 	EXTRAS=()
@@ -241,6 +246,11 @@ function encode_one {
 	echo -n "\"${arg//\"/\\\"}\" "
     done
     echo "&> \"$LOGFILE\""
+    echo ""
+    echo "View logs:"
+    echo "tail -f \"$LOGFILE\""
+    echo "tail -F currentlog"
+    echo ""
     echo " - $(date)"
     mkdir -p "$(dirname "$OUTPUT")"
     mkdir -p "$(dirname "$LOGFILE")"
@@ -248,6 +258,7 @@ function encode_one {
     if [ -n "$DRYRUN" ]; then
 	echo "  -- dry run requested, not running"
     else
+	ln -fs "$LOGFILE" currentlog
 	"${CMD[@]}" &> "$LOGFILE"
     fi
     echo " - $(date)"
