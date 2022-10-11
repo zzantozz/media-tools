@@ -68,7 +68,7 @@ Format must be one of "video" or "output":
   will be sampled and analyzed.
 
 - output: The input arg is a file with output from running the ffmpeg
-  "idet" filter. I.e. a video stream has already been run throug the
+  "idet" filter. I.e. a video stream has already been run through the
   filter. Just scan the output in the file and determine the
   interlacing status
 

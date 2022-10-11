@@ -8,7 +8,7 @@
     echo "without having to read the entire video."
     echo ""
     echo "If the video is short, it won't do samples and stream the whole" >&2
-    echo "video instead." >$2
+    echo "video instead." >&2
     exit 1
 }
 [ -z "$2" ] || [ "$2" -gt -1 ] || {
