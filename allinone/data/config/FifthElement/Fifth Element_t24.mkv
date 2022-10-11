@@ -1,0 +1,3 @@
+OUTPUTNAME="Featurettes/The Star Element - Chris Tucker.mkv"
+KEEP_STREAMS=all
+FFMPEG_EXTRA_OPTIONS="-disposition:s:0 0"

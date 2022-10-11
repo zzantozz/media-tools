@@ -1,0 +1,4 @@
+OUTPUTNAME="The Fifth Element.mkv"
+KEEP_STREAMS=all
+CUT_STREAMS=(0:0 0:1 0:2)
+FFMPEG_EXTRA_OPTIONS="-c:2 ac3 -ac:2 6 -b:2 384k"
