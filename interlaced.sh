@@ -113,8 +113,24 @@ debug "tff: $TFF2 bff: $BFF2 prog: $PROG2 undetermined: $UNDET2"
 
 VALUES="Single frame: tff=$TFF1 bff=$BFF1 progressive=$PROG1 undetermined=$UNDET1\nDouble frame: tff=$TFF2 bff=$BFF2 progressive=$PROG2 undetermined=$UNDET2"
 
-[ $((10*(TFF1+BFF1))) -lt $PROG1 ] && ANSWER1=progressive
-[ $((10*(TFF2+BFF2))) -lt $PROG2 ] && ANSWER2=progressive
+# If progressive frames greatly outweight interlaced, it's progressive
+[ $PROG1 -gt $((100*(TFF1+BFF1))) ] && {
+    debug "Decided single=progressive because progressive frames greatly outweigh interlaced."
+    ANSWER1=progressive
+}
+[ $PROG2 -gt $((100*(TFF2+BFF2))) ] && {
+    debug "Decided multi=progressive because progressive frames greatly outweigh interlaced."
+    ANSWER2=progressive
+}
+# Similarly in the other direction
+[ $((TFF1+BFF1)) -gt $((100*PROG1)) ] && {
+    debug "Decided single=interlaced because interlaced frames greatly outweigh progressive."
+    ANSWER1=interlaced
+}
+[ $((TFF2+BFF2)) -gt $((100*PROG2)) ] && {
+    debug "Decided multi=interlaced because interlaced frames greatly outweigh progressive."
+    ANSWER2=interlaced
+}
 
 # If nothing has worked yet and undetermined is the highest number, abort
 [ -z "$ANSWER1" ] && [ $UNDET1 -gt $TFF1 ] && [ $UNDET1 -gt $BFF1 ] && [ $UNDET1 -gt $PROG1 ] && {
@@ -128,9 +144,28 @@ VALUES="Single frame: tff=$TFF1 bff=$BFF1 progressive=$PROG1 undetermined=$UNDET
     exit 1
 }
 
-# If top- or bottom-frame-first numbers are bigger, it's interlaced. If not, progressive.
-[ $TFF1 -gt $PROG1 ] || [ $BFF1 -gt $PROG1 ] && ANSWER1=interlaced || ANSWER1=progressive
-[ $TFF2 -gt $PROG2 ] || [ $BFF2 -gt $PROG2 ] && ANSWER2=interlaced || ANSWER2=progressive
+debug "Undetermined frames don't keep us from continuing."
+
+# If we don't have an answer yet but made it past the "undetermined" check, then whichever frame count is biggest wins.
+[ -z "$ANSWER1" ] && {
+    if [ $TFF1 -gt $PROG1 ] || [ $BFF1 -gt $PROG1 ]; then
+	debug "Decided single=interlaced because there are more interlaced frames than progressive."
+	ANSWER1=interlaced
+    else
+	debug "Decided single=progressive because there are more progressive frames than interlaced."
+	ANSWER1=progressive
+    fi
+}
+
+[ -z "$ANSWER2" ] && {
+    if [ $TFF2 -gt $PROG2 ] || [ $BFF2 -gt $PROG2 ]; then
+	debug "Decided multi=interlaced because there are more interlaced frames than progressive."
+	ANSWER2=interlaced
+    else
+	debug "Decided multi=progressive because there are more progressive frames than interlaced."
+	ANSWER2=progressive
+    fi
+}
 
 # If single and multi disagree, abort
 [ $ANSWER1 = $ANSWER2 ] || {
