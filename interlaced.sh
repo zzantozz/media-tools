@@ -3,7 +3,7 @@
 MYDIR="$(dirname "$0")"
 
 function debug {
-    [ "$DEBUG" = "interlaced" ] && echo -e "$1" 1>&2
+    [[ "$DEBUG" =~ "interlaced" ]] && echo -e "$1" 1>&2
     return 0
 }
 

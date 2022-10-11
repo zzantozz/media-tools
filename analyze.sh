@@ -30,7 +30,7 @@ if [ -z "$input" ] || [ ! -f "$input" ]; then
 fi
 
 function debug {
-    [ "$DEBUG" = analyze ] && echo "$1" >&2
+    [[ "$DEBUG" =~ analyze ]] && echo "$1" >&2
     return 0
 }
 
