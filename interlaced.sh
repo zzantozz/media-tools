@@ -7,7 +7,6 @@ function debug {
     return 0
 }
 
-positional=()
 while [ $# -gt 0 ]; do
     key="$1"
     case "$key" in
@@ -19,9 +18,13 @@ while [ $# -gt 0 ]; do
 	    format="$2"
 	    shift 2
 	    ;;
+	-k|--cache-key)
+	    cache_key="$2"
+	    shift 2
+	    ;;
 	*)
-	    positional+=("$1")
-	    shift
+	    echo "Unknown arg: $1"
+	    exit 1
 	    ;;
     esac
 done
@@ -34,6 +37,10 @@ Input can be a video file to sample or the output of running a
 video through ffmpeg's idet filter. Indicate which with the
 -f/--format option.
 
+Pass a cache key with -k|--cache-key. This will be used as a path
+to create cache files in the cache dir, instead of the default
+path munging.
+
 Outputs "interlaced" or "progressive" to indicate the interlacing
 state of the input.
 
@@ -41,10 +48,15 @@ EOF
     exit 1
 }
 
-BASENAME=$(basename "$input")
-CACHEFILE="cache/interlaced/$BASENAME"
-debug "Check cache file: $CACHEFILE"
-[ -f "$CACHEFILE" ] && cat "$CACHEFILE" && exit 0
+input_without_slashes="${input//\//_}"
+input_without_leading_dot="${input_without_slashes/#./_}"
+CACHEKEY=${cache_key:-$input_without_leading_dot}
+CACHEFILE="cache/interlaced/$CACHEKEY"
+USECACHE=${USECACHE:-true}
+[ "$USECACHE" = true ] && {
+    debug "Check cache file: $CACHEFILE"
+    [ -f "$CACHEFILE" ] && cat "$CACHEFILE" && exit 0
+}
 
 [ "$format" = "video" ] || [ "$format" = "output" ] || {
     cat << EOF >&2

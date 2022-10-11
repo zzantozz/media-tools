@@ -5,7 +5,7 @@
 [ $# -eq 2 ] || {
 	echo "Checks if an mkv file has been encoded by examining a log file of ffmpeg output."
 	echo "Takes two args:"
-	echo "1. The name or path of an mkv file"
+	echo "1. The name or relative path of an mkv file"
 	echo "2. The path to a directory containing log files"
 	echo ""
 	echo 'Returns 0 if a log file named "$1.log" or "$(basename "$1").log" exists and looks'
