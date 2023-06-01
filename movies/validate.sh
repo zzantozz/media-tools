@@ -80,8 +80,8 @@ else
 	echo "Doesn't set KEEP_STREAMS"
 	exit 1
     }
-    [ "${#KEEP_STREAMS[@]}" -gt 1 ] || {
-	echo "KEEP_STREAMS should be an array with more than one thing in it"
+    [ "$KEEP_STREAMS" = all ] || [ "${#KEEP_STREAMS[@]}" -gt 1 ] || {
+	echo "KEEP_STREAMS should be the string 'all' or an array with more than one thing in it"
 	exit 1
     }
     D=[[:digit:]]

@@ -83,8 +83,8 @@ debug "Using config file $CONFIGFILE"
 
 source "$CONFIGFILE"
 [ -n "$CUT_STREAMS" ] || {
-	debug "No CUT_STREAMS in config file $CONFIGFILE"
-	debug "You need to configure which streams to cut for the filtering."
+	echo "No CUT_STREAMS in config file $CONFIGFILE" >&2
+	echo "You need to configure which streams to cut for the filtering." >&2
 	exit 1
 }
 debug "Streams to cut: ${CUT_STREAMS[@]}"
