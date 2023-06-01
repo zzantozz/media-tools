@@ -1,0 +1,3 @@
+OUTPUTNAME="Armageddon.mkv"
+KEEP_STREAMS=all
+CUT_STREAMS=(0:0 0:1)
