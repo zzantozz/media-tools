@@ -1,29 +1,55 @@
 #!/bin/bash -e
 
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+echo "Running from $script_dir"
+
+# Base directories that contain details of media processing. "cache" is for temporary things. These shouldn't be committed.
+# "data" is where information is stored about how to process specific files. This should be committed. I normally keep these
+# in the same directory as the script. "data" is committed there.
+CACHEDIR="${CACHEDIR:-"$script_dir/cache"}"
+export CACHEDIR
+DATADIR="${DATADIR:-"$script_dir/data"}"
+export DATADIR
+
 # Contains named files representing files already encoded. Remove a file to make it get processed again.
-DONEDIR="cache/done"
+DONEDIR="$CACHEDIR/done"
 export DONEDIR
-mkdir -p "$DONEDIR"
 # Contains the ffmpeg logs to ensure an encode finished successfully
-LOGDIR="cache/log"
+LOGDIR="$CACHEDIR/log"
 export LOGDIR
-mkdir -p "$LOGDIR"
 # Contains config files with data for each movie file to be encoded.
-CONFIGDIR="data/config"
+CONFIGDIR=${CONFIGDIR:-"$DATADIR/config"}
 export CONFIGDIR
 # Directory to scan for raw mkv's ripped from disc
-INPUTDIR="/media/plex-media-2/ripping/media-in"
+INPUTDIR=${INPUTDIR:-"/media/plex-media-2/ripping/media-in"}
 export INPUTDIR
 # Root directory of movies library, where final transcoded movies go, possibly in a subdirectory to organize
 # related items the way Plex likes them.
-MOVIESDIR="/media/plex-media/movies"
+MOVIESDIR=${MOVIESDIR:-"/media/plex-media/movies"}
 export MOVIESDIR
 # Root directory of tv shows library, where final transcoded shows go.
-TVSHOWSDIR="/media/plex-media/tv-shows"
+TVSHOWSDIR=${TVSHOWSDIR:-"/media/plex-media/tv-shows"}
 export TVSHOWSDIR
 # Directory holding general ripping tools
-TOOLSDIR="/media/plex-media-2/ripping/tools"
+TOOLSDIR=${TOOLSDIR:-"/media/plex-media-2/ripping/tools"}
 export TOOLSDIR
+
+die() {
+	echo "ERROR: $1" >&2
+	exit 1
+}
+
+[ -d "$CACHEDIR" ] || die "CACHEDIR doesn't exist: $CACHEDIR"
+[ -d "$DATADIR" ] || die "DATADIR doesn't exist: $DATADIR"
+[ -d "$CONFIGDIR" ] || die "CONFIGDIR doesn't exist: $CONFIGDIR"
+[ -d "$INPUTDIR" ] || die "INPUTDIR doesn't exist: $INPUTDIR"
+[ -d "$MOVIESDIR" ] || die "MOVIESDIR doesn't exist: $MOVIESDIR"
+[ -d "$TVSHOWSDIR" ] || die "TVSHOWSDIR doesn't exist: $TVSHOWSDIR"
+[ -d "$TOOLSDIR" ] || die "TOOLSDIR doesn't exist: $TOOLSDIR"
+
+# Ensure cache subdirectories exist.
+mkdir -p "$DONEDIR"
+mkdir -p "$LOGDIR"
 
 # List of outputs to build the map values from in the function. Can't be an array because those can't be exported.
 OUTSTRING="[outa] [outb] [outc] [outd] [oute] [outf] [outg] [outh] [outi] [outj] [outkl] [outm] [outn] [outo] [outp] [outq]"
@@ -208,7 +234,7 @@ function encode_one {
     input_length=$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=DURATION-eng -of default=noprint_wrappers=1:nokey=1 "$input_abs_path" | cut -d '.' -f 1)
     echo "Duration: $input_length"
 
-    details_file="data/details/$input_rel_path"
+    details_file="$DATADIR/details/$input_rel_path"
     if [ ! -f "$details_file" ]; then
         echo "Gathering title details including sha1sum, may take a while"
         input_sha1=$(sha1sum "$input_abs_path" | awk '{print $1}')
@@ -267,7 +293,7 @@ EOF
     VQ=$("$TOOLSDIR/quality.sh" "$input_abs_path")
     debug "Quality: $VQ"
 
-    if [ -f "data/cuts/$input_rel_path" ]; then
+    if [ -f "$DATADIR/cuts/$input_rel_path" ]; then
 	FILTERCMD=("./filter.sh" "$input_abs_path")
 	EXTRAS=()
 	[ "$INTERLACED" = "interlaced" ] && EXTRAS+=("yadif")
