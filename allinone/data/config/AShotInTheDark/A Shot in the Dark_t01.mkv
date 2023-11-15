@@ -1,0 +1,2 @@
+OUTPUTNAME="A Shot in the Dark.mkv"
+KEEP_STREAMS=(0:0 0:1 0:7 0:9)
