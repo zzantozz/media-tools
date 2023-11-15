@@ -1,0 +1,3 @@
+OUTPUTNAME="The Pink Panther.mkv"
+KEEP_STREAMS=(0:0 0:1 0:7 0:9 0:10)
+FFMPEG_EXTRA_OPTIONS="-disposition:s:1 forced"
