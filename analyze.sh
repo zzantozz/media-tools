@@ -45,25 +45,30 @@ USECACHE=${USECACHE:-true}
     [ -f "$CACHEFILE" ] && cat "$CACHEFILE" && exit 0
 }
 
-debug "Analyzing input"
-TMP="$(mktemp)"
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf -- "$tmp_dir"' EXIT
+
+debug "Sampling input to file"
 debug " - $(date)"
-$MYDIR/sample.sh "$input" 30 | ffmpeg -y -i pipe: -filter 'idet,cropdetect=round=2' -f null /dev/null &> "$TMP"
+$MYDIR/sample.sh -i "$input" -m 2 -f file -o "$tmp_dir/sampled.mkv"
+debug " - $(date)"
+debug "Analyzing sampled file"
+debug " - $(date)"
+ffmpeg -y -i "$tmp_dir/sampled.mkv" -filter 'idet,cropdetect=round=2' -f null /dev/null &> "$tmp_dir/analyze_data"
 debug " - $(date)"
 
 [ $USECACHE = true ] && mkdir -p "$(dirname "$CACHEFILE")"
-if INTERLACED=$("$MYDIR/interlaced.sh" -i "$TMP" -f output -k "$CACHEKEY"); then
+if INTERLACED=$("$MYDIR/interlaced.sh" -i "$tmp_dir/analyze_data" -f output -k "$CACHEKEY"); then
     debug "Interlaced: $INTERLACED"
     echo "INTERLACED=$INTERLACED"
     [ $USECACHE = true ] && echo "INTERLACED=$INTERLACED" >> "$CACHEFILE"
 else
     debug "Interlace detection failed, but continuing, since it could be set manually"
 fi
-if CROPPING=$("$MYDIR/crop.sh" -i "$TMP" -f output); then
+if CROPPING=$("$MYDIR/crop.sh" -i "$tmp_dir/analyze_data" -f output); then
     debug "Cropping: $CROPPING"
     echo "CROPPING=$CROPPING"
     [ $USECACHE = true ] && echo "CROPPING=$CROPPING" >> "$CACHEFILE"
 else
     debug "Crop detect failed, but continuing, since it could be set manually"
 fi
-rm "$TMP"

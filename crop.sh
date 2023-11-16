@@ -69,6 +69,8 @@ if [ "$format" = "video" ]; then
     TMP=$(mktemp)
     debug "Sampling video file"
     debug " - $(date)"
+    echo "This is broken! Fix for new sample.sh input options!"
+    exit 1
     "$MYDIR/sample.sh" "$input" 30 | \
 	ffmpeg -i pipe: -filter "cropdetect=round=2" -f null -y /dev/null 2>&1 | \
 	grep '\[Parsed_cropdetect' | sed 's/.*crop=\(.*\)/\1/' > "$TMP"
