@@ -415,6 +415,7 @@ EOF
     else
 	ln -fs "$LOGFILE" currentlog
 	"${CMD[@]}" &> "$LOGFILE"
+	encode_result="$?"
     fi
     echo " - $(date)"
 
@@ -422,7 +423,7 @@ EOF
         echo "Rough encode done, not marking file as done done."
     elif [ -n "$DRYRUN" ]; then
         echo "Dry run, not marking file as done done."
-    elif "$TOOLSDIR/done.sh" "$output_rel_path" "$LOGDIR"; then
+    elif [ "$encode_result" -eq 0 ]; then
         echo "Marking file as done done."
         mkdir -p "$(dirname "$DONEFILE")"
         touch "$DONEFILE"
