@@ -1,2 +1,3 @@
 OUTPUTNAME="Sweeney Todd.mkv"
 KEEP_STREAMS=all
+FFMPEG_EXTRA_OPTIONS="-disposition:s:0 0"
