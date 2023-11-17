@@ -55,7 +55,7 @@ debug " - $(date)"
 debug "Analyzing sampled file"
 debug " - $(date)"
 CMD=(ffmpeg)
-[ -n "$USE_GPU" ] && CMD+=(ffmpeg -hwaccel cuda -hwaccel_output_format cuda)
+#[ -n "$USE_GPU" ] && CMD+=(-hwaccel cuda -hwaccel_output_format cuda)
 CMD+=(-y -i "$tmp_dir/sampled.mkv" -filter 'idet,cropdetect=round=2' -f null /dev/null)
 "${CMD[@]}" &> "$tmp_dir/analyze_data"
 debug " - $(date)"

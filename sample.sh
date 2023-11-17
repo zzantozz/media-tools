@@ -77,6 +77,7 @@ else
     debug "Broke into $STREAMCOUNT chunks"
     TOTALLEN=$((CHECKLEN*STREAMCOUNT))
     CMD=(ffmpeg)
+#    [ -n "$USE_GPU" ] && CMD+=(-hwaccel cuda -hwaccel_output_format cuda)
     CMD+=("${INPUTS[@]}")
     CMD+=(-max_muxing_queue_size 1024)
     CMD+=(-filter_complex "$FILTER ${OUTPUTS}concat=n=$STREAMCOUNT[final]")
