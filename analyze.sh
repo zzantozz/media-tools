@@ -54,7 +54,10 @@ $MYDIR/sample.sh -i "$input" -m 2 -f file -o "$tmp_dir/sampled.mkv"
 debug " - $(date)"
 debug "Analyzing sampled file"
 debug " - $(date)"
-ffmpeg -y -i "$tmp_dir/sampled.mkv" -filter 'idet,cropdetect=round=2' -f null /dev/null &> "$tmp_dir/analyze_data"
+CMD=(ffmpeg)
+[ -n "$USE_GPU" ] && CMD+=(ffmpeg -hwaccel cuda -hwaccel_output_format cuda)
+CMD+=(-y -i "$tmp_dir/sampled.mkv" -filter 'idet,cropdetect=round=2' -f null /dev/null)
+"${CMD[@]}" &> "$tmp_dir/analyze_data"
 debug " - $(date)"
 
 [ $USECACHE = true ] && mkdir -p "$(dirname "$CACHEFILE")"

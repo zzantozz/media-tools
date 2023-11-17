@@ -358,7 +358,7 @@ EOF
     CMD=(ffmpeg)
     #CMD=(docker run --rm -v "$TOOLSDIR":"$TOOLSDIR" -v "$MOVIESDIR":"$MOVIESDIR" -w "$(pwd)" jrottenberg/ffmpeg -stats)
 
-    CMD+=(-hwaccel cuda -hwaccel_output_format cuda)
+    [ -n "$USE_GPU" ] && CMD+=(-hwaccel cuda -hwaccel_output_format cuda)
     CMD+=(-hide_banner -y -i "$input_abs_path")
 
     # This because several videos end up failing with the "Too many packets buffered for output stream XXX" error.
@@ -376,7 +376,11 @@ EOF
 	#CMD+=(-c:0 mpeg2video -threads:0 2)
 	CMD+=(-c:0 libx264 -preset ultrafast)
     } || {
-	CMD+=(-c:0 hevc_nvenc -crf:0 "$VQ")
+        if [ -n "$USE_GPU" ]; then
+          CMD+=(-c:0 hevc_nvenc -crf:0 "$VQ")
+        else
+          CMD+=(-c:0 libx265 -crf:0 "$VQ")
+        fi
     }
     [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ] && {
 	CMD+=(-c:1 ac3 -ac:1 6 -b:1 384k)
