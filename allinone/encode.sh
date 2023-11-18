@@ -209,6 +209,8 @@ function encode_one {
     }
 
     output_abs_path="$base_output_dir/$output_rel_path"
+    output_tmp_path="$base_output_dir/$(dirname "$output_rel_path")/$(basename "$output_rel_path").part"
+    trap 'rm -f "$output_tmp_path"' EXIT
 
     DONEFILE="$DONEDIR/$output_rel_path"
     DONE=false
@@ -397,7 +399,7 @@ EOF
 	CMD+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
     }
     CMD+=($FFMPEG_EXTRA_OPTIONS)
-    CMD+=("$output_abs_path")
+    CMD+=(-f matroska "$output_tmp_path")
     LOGFILE="$LOGDIR/$output_rel_path.log"
     DONEFILE="$DONEDIR/$output_rel_path"
 
@@ -418,7 +420,7 @@ EOF
 	echo "  -- dry run requested, not running"
     else
 	ln -fs "$LOGFILE" currentlog
-	"${CMD[@]}" &> "$LOGFILE"
+	"${CMD[@]}" &> "$LOGFILE" && mv "$output_tmp_path" "$output_abs_path"
 	encode_result="$?"
     fi
     echo " - $(date)"
