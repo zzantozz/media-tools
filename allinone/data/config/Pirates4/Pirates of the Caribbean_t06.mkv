@@ -1,2 +1,3 @@
 OUTPUTNAME="Deleted Scenes/Deleted Scenes 7.mkv"
 KEEP_STREAMS=all
+NEVER_GPU=true
