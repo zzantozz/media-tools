@@ -1,6 +1,7 @@
 #!/bin/bash -e
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
+export script_dir
 echo "Running from $script_dir"
 
 # Base directories that contain details of media processing. "cache" is for temporary things. These shouldn't be committed.
@@ -296,7 +297,7 @@ EOF
     debug "Quality: $VQ"
 
     if [ -f "$DATADIR/cuts/$input_rel_path" ]; then
-	FILTERCMD=("./filter.sh" "$input_abs_path")
+	FILTERCMD=("$script_dir/filter.sh" "$input_abs_path")
 	EXTRAS=()
 	[ "$INTERLACED" = "interlaced" ] && EXTRAS+=("yadif")
 	[ "$CROPPING" = none ] || EXTRAS+=("crop=$CROPPING")

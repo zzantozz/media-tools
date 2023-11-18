@@ -1,5 +1,14 @@
 #!/bin/bash -e
 
+# Stuff copied from encode.sh to stay in sync with it.
+# Would it be better to source it from a common location?
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+export script_dir
+echo "Running from $script_dir" >&2
+
+DATADIR="${DATADIR:-"$script_dir/data"}"
+export DATADIR
+
 function debug {
 	[ "$DEBUG" = "filter" ] && echo -e "$1" 1>&2
 	return 0
@@ -31,7 +40,7 @@ done
 debug "Using extra video filters from command line: $EXTRA_VFILTERS"
 BASENAME="$(basename "$FILE")"
 MOVIEDIR="$(basename $(dirname "$FILE"))"
-CUTS_FILE="data/cuts/$MOVIEDIR/$BASENAME"
+CUTS_FILE="$DATADIR/cuts/$MOVIEDIR/$BASENAME"
 
 [ -f "$CUTS_FILE" ] || {
 	debug "Not filtering because cuts file missing: $CUTS_FILE"
@@ -78,7 +87,7 @@ debug "Cuts file format: $FORMAT"
 
 debug "Cuts to make:\n${TIMESTAMPS[*]}"
 
-CONFIGFILE="data/config/$MOVIEDIR/$BASENAME"
+CONFIGFILE="$DATADIR/config/$MOVIEDIR/$BASENAME"
 debug "Using config file $CONFIGFILE"
 
 source "$CONFIGFILE"
