@@ -60,7 +60,7 @@ export OUTSTRING
 [ -n "$DRYRUN" ] && export DRYRUN
 
 function debug {
-    [ "$DEBUG" = "encode" ] && echo -e "$1" 1>&2
+    [[ "$DEBUG" =~ "encode" ]] && echo -e "$1" 1>&2
     return 0
 }
 export -f debug

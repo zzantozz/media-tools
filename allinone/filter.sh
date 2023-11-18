@@ -10,7 +10,7 @@ DATADIR="${DATADIR:-"$script_dir/data"}"
 export DATADIR
 
 function debug {
-	[ "$DEBUG" = "filter" ] && echo -e "$1" 1>&2
+	[[ "$DEBUG" =~ "filter" ]] && echo -e "$1" 1>&2
 	return 0
 }
 
