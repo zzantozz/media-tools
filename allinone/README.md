@@ -23,3 +23,12 @@ files. It should fail hard for a couple of things. There's work to do
 still!
 
 Next up, try encoding some movies with this to see how it goes.
+
+# IMPORTANT
+
+A lot of this depends on MakeMKV settings. I rip with a minimum title
+length of 30 seconds and this for title selection:
+
+```
+-sel:all,+sel:(favlang|nolang),-sel:mvcvideo,=100:all,-10:favlang,+sel:attachment
+```
