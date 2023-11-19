@@ -368,10 +368,17 @@ EOF
     # I don't think this will cause any problems.
     CMD+=(-max_muxing_queue_size 1024)
 
+    # Map in the actual streams
+    CMD+=($MAPS -c copy)
+    # Only take english streams. I normally do this in makemkv settings so that only the english streams are in the rip,
+    # but some files have snuck in that have additional languages in them.
+    # Note to self: I think this would throw off KEEP_STREAMS and CUT_STREAMS if it were used with them anywhere. It should
+    # be safe for anything using KEEP_STREAMS=all.
+    CMD+=(-map -0:m:language:fra -map -0:m:language:spa -map -0:m:language:ita)
+
     # Use one filter or the other, if set. Setting both will cause an error, but that's checked earlier, and even if it's not,
     # ffmpeg will tell you what you did wrong.
     [ -z "$COMPLEXFILTER" ] || CMD+=(-filter_complex "$COMPLEXFILTER")
-    CMD+=($MAPS -c copy)
     [ -n "$VFILTERSTRING" ] && CMD+=("-filter:v:0" "$VFILTERSTRING")
 
     # Do real video encoding, or speed encode for checking the output?
