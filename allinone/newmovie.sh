@@ -2,13 +2,10 @@
 
 # Purpose: to make it easy to create a new movie config.
 #
-# This script should take a ripped dir name to inspect and the proper name of the movie in it. Then magic.
-# I'm not sure exactly what, but it should certainly create the movie dir and "main" file. After that, it
-# could step through each file in the input dir and prompt for details of each. If it prompts for input,
-# it should show the ffprobe streams. Default to all streams. Also show list of valid Plex labels for extras.
-# Maybe even offer it as a choice and fill in automatically.
+# This script takes a ripped dir name to inspect and the proper name of the movie in it. It creates the "main"
+# movie config file, and it steps through each file in the input dir and prompts for details of each. Default
+# to all streams. After collecting information about the title, it writes out a data file for it.
 
-base_dir="/mnt/d/ripping"
 config_dir="/home/ryan/media-tools/allinone/data/config"
 
 die() {
@@ -17,20 +14,17 @@ die() {
 }
 
 usage() {
-  echo "Usage: $0 -i <input name> -n <movie name> [-b <base dir>] [-c <config dir>]" >&2
+  echo "Usage: $0 -i <input name> -n <movie name> [-c <config dir>]" >&2
   exit 1
 }
 
 while getopts "i:n:b:c:" opt; do
   case "$opt" in
     i)
-      input_name="$OPTARG"
+      input_dir="$OPTARG"
       ;;
     n)
       movie_name="$OPTARG"
-      ;;
-    b)
-      base_dir="$OPTARG"
       ;;
     c)
       config_dir="$OPTARG"
@@ -42,12 +36,8 @@ if [ -z "$input_name" ] || [ -z "$movie_name" ]; then
   usage
 fi
 
-if [ -d "$input_name" ]; then
-  input_dir="$input_name"
-elif [ -d "$base_dir/$input_name" ]; then
-  input_dir="$base_dir/$input_name"
-else
-  die "input name should be path to a ripped movie dir or name of a dir in the base dir, was: $input_name"
+if ! [ -d "$input_dir" ]; then
+  die "input dir should be path to a ripped movie dir, was: $input_name"
 fi
 
 if ! ([ -d "$config_dir" ] && [ "config" = "$(basename "$config_dir")" ] && [ "data" = "$(basename "$(dirname "$config_dir")")" ]); then
