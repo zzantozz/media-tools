@@ -165,7 +165,9 @@ function encode_one {
     # show, which will probably have to be a setting in the main
     # config file. Is there any other way to tell the difference?
     # Maybe if the final output path contains the string "/Season
-    # \d+/"?
+    # \d+/"? Actually, maybe just if SEASON is set. That could come
+    # either from the config or from parsing it out of the path, below.
+    # In either case, if the thing has a SEASON, it must be a show.
     [ -n "$MAIN_NAME" ] || {
 	echo "Missing MAIN_NAME from configuration. It should be set in the main config" >&2
 	echo "file for the title at: $main_config" >&2
@@ -180,7 +182,11 @@ function encode_one {
 	SEASON="${BASH_REMATCH[1]}"
     fi
     
-    if [ -n "$OUTPUTNAME" ]; then
+    if [ -n "$OUTPUTNAME" ] && [ -n "$SEASON" ]; then
+        # It's a TV show with specified output name
+	output_rel_path="$MAIN_NAME/Season $SEASON/$OUTPUTNAME"
+	base_output_dir="$TVSHOWSDIR"
+    elif [ -n "$OUTPUTNAME" ]; then
 	output_rel_path="$MAIN_NAME/$OUTPUTNAME"
 	base_output_dir="$MOVIESDIR"
     elif [ -n "$SEASON" ] && [ -n "$EPISODE" ]; then
