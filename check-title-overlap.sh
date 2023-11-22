@@ -14,12 +14,14 @@ contains_all() { items=($2); for item in "${items[@]}"; do if ! contains "$1" "$
 
 segment_map=()
 while read -r line; do
-  if [[ "$line" =~ ^TINFO:(.+),26,0,\"(.*)\"$ ]]; then
+  if [[ "$line" =~ ^TINFO:(.+),26,0,\"(.*)\" ]]; then
     title="${BASH_REMATCH[1]}"
     segments=$(echo "${BASH_REMATCH[2]}" | tr , ' ')
     segment_map["$title"]="$segments"
   fi
 done < "${1:-/dev/stdin}"
+
+echo "Got ${#segment_map[@]} titles"
 
 for title in "${!segment_map[@]}"; do
   for k in "${!segment_map[@]}"; do
