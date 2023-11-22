@@ -32,12 +32,12 @@ while getopts "i:n:b:c:" opt; do
   esac
 done
 
-if [ -z "$input_name" ] || [ -z "$movie_name" ]; then
+if [ -z "$input_dir" ] || [ -z "$movie_name" ]; then
   usage
 fi
 
 if ! [ -d "$input_dir" ]; then
-  die "input dir should be path to a ripped movie dir, was: $input_name"
+  die "input dir should be path to a ripped movie dir, was '$input_dir'"
 fi
 
 if ! ([ -d "$config_dir" ] && [ "config" = "$(basename "$config_dir")" ] && [ "data" = "$(basename "$(dirname "$config_dir")")" ]); then
