@@ -7,6 +7,11 @@ function debug {
     return 0
 }
 
+die() {
+    echo "ERROR: $1" >&2
+    exit 1
+}
+
 while [ $# -gt 0 ]; do
     key="$1"
     case "$key" in
@@ -48,10 +53,12 @@ EOF
     exit 1
 }
 
+[ -d "$CACHEDIR" ] || die "CACHEDIR not set; atm, it's required by this script"
+
 input_without_slashes="${input//\//_}"
 input_without_leading_dot="${input_without_slashes/#./_}"
 CACHEKEY=${cache_key:-$input_without_leading_dot}
-CACHEFILE="cache/interlaced/$CACHEKEY"
+CACHEFILE="$CACHEDIR/interlaced/$CACHEKEY"
 USECACHE=${USECACHE:-true}
 [ "$USECACHE" = true ] && {
     debug "Check cache file: $CACHEFILE"

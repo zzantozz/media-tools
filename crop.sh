@@ -7,6 +7,11 @@ function debug {
     return 0
 }
 
+die() {
+    echo "ERROR: $1" >&2
+    exit 1
+}
+
 positional=()
 while [ $# -gt 0 ]; do
     key="$1"
@@ -42,8 +47,10 @@ EOF
     exit 1
 }
 
+[ -d "$CACHEDIR" ] || die "CACHEDIR doesn't exist: $CACHEDIR"
+
 BASENAME=$(basename "$input")
-CACHEFILE="cache/crop/$BASENAME"
+CACHEFILE="$CACHEDIR/crop/$BASENAME"
 debug "Check cache file: $CACHEFILE"
 [ -f "$CACHEFILE" ] && cat "$CACHEFILE" && exit 0
 
