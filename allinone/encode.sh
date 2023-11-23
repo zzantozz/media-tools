@@ -181,29 +181,40 @@ function encode_one {
     if [ -z "$SEASON" ] && [[ "$input_rel_path" =~ $rex ]]; then
 	SEASON="${BASH_REMATCH[1]}"
     fi
-    
-    if [ -n "$OUTPUTNAME" ] && [ -n "$SEASON" ]; then
-        # It's a TV show with specified output name
-	output_rel_path="$MAIN_NAME/Season $SEASON/$OUTPUTNAME"
-	base_output_dir="$TVSHOWSDIR"
-    elif [ -n "$OUTPUTNAME" ]; then
-	output_rel_path="$MAIN_NAME/$OUTPUTNAME"
-	base_output_dir="$MOVIESDIR"
+
+    if [ -n "$OUTPUTNAME" ]; then
+        output_rel_path="$MAIN_NAME/$OUTPUTNAME"
     elif [ -n "$SEASON" ] && [ -n "$EPISODE" ]; then
-	# This only does 2-digit season and episode; probably need to
-	# allow for three at some point. Do it always? Or based on
-	# config?
-	padded_season="$(printf %.2d $SEASON)"
-	padded_episode="$(printf %.2d $EPISODE)"
-	output_rel_path="$MAIN_NAME/Season $SEASON/$MAIN_NAME s${padded_season}e${padded_episode}.mkv"
-	base_output_dir="$TVSHOWSDIR"
+        # This only does 2-digit season and episode; probably need to
+        # allow for three at some point. Do it always? Or based on
+        # config?
+        padded_season="$(printf %.2d $SEASON)"
+        padded_episode="$(printf %.2d $EPISODE)"
+        output_rel_path="$MAIN_NAME/Season $SEASON/$MAIN_NAME s${padded_season}e${padded_episode}.mkv"
     else
-	echo "Missing fields from config: $config_file" >&2
-	echo "It must contain either:" >&2
-	echo "1. OUTPUTNAME, giving the relative path of the output file, or" >&2
-	echo "2. both SEASON and EPISODE for a tv show so that an output path can be built." >&2
-	echo "   (Except if the input path contains /Season xxx/, then SEASON can come from there." >&2
-	exit 1
+        echo "Missing fields from config: $config_file" >&2
+        echo "It must contain either:" >&2
+        echo "1. OUTPUTNAME, giving the relative path of the output file, or" >&2
+        echo "2. both SEASON and EPISODE for a tv show so that an output path can be built." >&2
+        echo "   (Except if the input path contains /Season xxx/, then SEASON can come from there." >&2
+        exit 1
+    fi
+
+    if [ -n "$SEASON" ]; then
+        MAIN_TYPE_GUESS=tvshow
+    else
+        MAIN_TYPE_GUESS=movie
+    fi
+
+    # MAIN_TYPE could be configured. Only guess if it's not.
+    [ -z "$MAIN_TYPE" ] && MAIN_TYPE="$MAIN_TYPE_GUESS"
+
+    if [ "$MAIN_TYPE" = movie ]; then
+        base_output_dir="$MOVIESDIR"
+    elif [ "$MAIN_TYPE" = tvshow ] || [ "$MAIN_TYPE" = tv_show ]; then
+        base_output_dir="$TVSHOWSDIR"
+    else
+        die "No MAIN_TYPE configured, and couldn't determine one."
     fi
 
     # Okay, at this point, I think we've gathered all the information

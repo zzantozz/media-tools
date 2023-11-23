@@ -91,14 +91,14 @@ for f in "$input_dir"/*; do
     if [ "$t" = "Episode" ]; then
       read -p "Enter episode number: " answer
       episode_number="$(printf %0.2d "$answer")"
-      out_name="$show_name s${season_number}e${episode_number}.mkv"
+      out_name="Season $season_number/$show_name s${season_number}e${episode_number}.mkv"
     elif [ "$t" = "Special Episode" ]; then
       read -p "Enter episode number: " answer
       episode_number="$(printf %0.2d "$answer")"
-      out_name="$show_name s00e${episode_number}.mkv"
+      out_name="Season 0/$show_name s00e${episode_number}.mkv"
     elif [ "$t" = "Special Feature" ]; then
       read -p "Name: " answer
-      out_name="$show_name s00e${season_number}${disk_number} - $answer.mkv"
+      out_name="Season 0/$show_name s00e${season_number}${disk_number} - $answer.mkv"
     else
       echo "Not yet written"
       exit 1
