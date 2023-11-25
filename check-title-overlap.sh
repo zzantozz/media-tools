@@ -13,11 +13,17 @@ contains() { arr=($1); item="$2"; for x in "${arr[@]}"; do if [ "$x" = "$item" ]
 contains_all() { items=($2); for item in "${items[@]}"; do if ! contains "$1" "$item"; then return 1; fi; done; return 0; }
 
 segment_map=()
+duration_map=()
 while read -r line; do
   if [[ "$line" =~ ^TINFO:(.+),26,0,\"(.*)\" ]]; then
     title="${BASH_REMATCH[1]}"
     segments=$(echo "${BASH_REMATCH[2]}" | tr , ' ')
     segment_map["$title"]="$segments"
+  fi
+  if [[ "$line" =~ ^TINFO:(.+),9,0,\"(.*)\" ]]; then
+    title="${BASH_REMATCH[1]}"
+    time="${BASH_REMATCH[2]}"
+    duration_map["$title"]="$time"
   fi
 done < "${1:-/dev/stdin}"
 
@@ -29,9 +35,9 @@ for title in "${!segment_map[@]}"; do
       continue
     fi
     if [ "${segment_map[$k]}" = "${segment_map[$title]}" ]; then
-      echo "title $title is the same as title $k"
+      echo "title $title is the same as title $k - duration ${duration_map["$title"]}"
     elif contains_all "${segment_map[$k]}" "${segment_map[$title]}"; then
-      echo "title $title is fully contained by title $k"
+      echo "title $title (${duration_map["$title"]}) is fully contained by title $k (${duration_map["$k"]})"
     fi
   done
 done
