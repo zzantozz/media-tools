@@ -1,15 +1,9 @@
 #!/bin/bash
 
-# Purpose: make it easy to create configs for a new disk of a tv show.
-#
-# Similar to newmovie.sh, but for tv shows. I'm not sure whether it should be per disk, per season, per
-# show, or what. I'll start with per disk and see what happens.
-#
-# Note: For special features, it currently puts them in season 0 as episode ${season}${disk} - <name>,
-# where you're prompted for the name. This fits somewhat in Plex's tv special scheme. There has to
-# be a better way to do this...
+# Makes it easy to create configs for a new disk of a tv show.
 
 config_dir="/home/ryan/media-tools/allinone/data/config"
+base_ripping_dir="/mnt/l/ripping"
 
 die() {
   echo "ERROR: $1" >&2
@@ -17,17 +11,70 @@ die() {
 }
 
 usage() {
-  echo "Usage: $0 -i <input name> -n <show name> [-c <config dir>]" >&2
+  cat <<EOF >&2
+Usage: $0 -i <input name> -n <show name> [-s <season number>] [-d <disk number>] [-c <config dir>]
+
+For each ripped files in <input name>, this script displays stream info about the title, and prompts you for
+information about it. Based on the info you provide, it writes an appropriate config file into data/config.
+The config file will see that the title is written out to the tv-shows output directory with the appropriate
+season and episode.
+
+Critical info:
+
+  - episode number: The episode must be provided by you in response to prompts.
+
+  - season number: The season can be detected from the input path if it contains "Season *", or else you 
+    can set the season with the '-s' flag.
+
+  - disk number: For special features, the disk number is also required. This can be detected from the
+    input path if it contains "Dis[ck] *", or else you can set it with the '-d' flag.
+
+  - show name: This is a required input argument and will be the base directory where the entire show is
+    written to.
+
+  - base ripping directory: This is necessary to figure out what kind of input paths we're dealing with.
+    At the moment, this is hard-coded.
+
+TV special handling:
+
+This script distinguishes between "special episodes" and "special features". A special episode is something
+that shows up in TVDB and so can be mapped to an episode of season 0. A special feature is something that
+doesn't show up in TVDB.
+
+  - special episodes: Select this type and enter the episode number from TVDB that this matches.
+
+  - special features: Select this type and enter a descriptive name. I suggest following the pattern
+    '<special type> - <special name>' where "special type" matches the available Plex movie specials. This
+    allows for migration to a movie special if you want. See below. The script does its best to ensure each
+    special feature gets a unique episode number, since Plex will combine specials with the same episode
+    number.
+
+TV specials as a movie:
+
+Since Plex is pretty terrible at handling TV specials, unless they're specifically represented in TVDB,
+this script supports writing TV specials out as a movie, which works pretty well as far as browsing them in
+the Plex UI. Just set this environment variable to do so:
+
+  - TV_SPECIALS_AS_MOVIE: tells this script to write "special features" to the movies dir instead of the tv-shows
+    dir. This actually gives a better overall experience for browsing TV specials, since you can see their names.
+    Note that you have to have a root "movie file" in order for it to show up in the Plex movies library.
+EOF
   exit 1
 }
 
-while getopts "i:n:b:c:" opt; do
+while getopts "i:n:c:s:d:" opt; do
   case "$opt" in
     i)
       input_name="$OPTARG"
       ;;
     n)
       show_name="$OPTARG"
+      ;;
+    s)
+      season="$OPTARG"
+      ;;
+    d)
+      disk="$OPTARG"
       ;;
     c)
       config_dir="$OPTARG"
@@ -50,20 +97,21 @@ fi
 # Expect tv show structure and parse some info from it. Season and disk is usually numeric. Exceptions: season can be like "3.5" (BSG).
 # Disks can be like "1A" and "1B" (House).
 echo "input dir: $input_dir"
-[[ "$input_dir" =~ (([^/]+)/Season\ ([0-9\.]+)/Disk\ ([0-9AB]+)) ]] || die "Couldn't parse season and disk from input name"
-rel_path="${BASH_REMATCH[1]}"
-show="${BASH_REMATCH[2]}"
-season="${BASH_REMATCH[3]}"
-disk="${BASH_REMATCH[4]}"
-echo "Discovered from input: show=$show season=$season disk=$disk rel_path=$rel_path"
+[ -z "$season" ] && [[ "$input_dir" =~ Season\ ([0-9\.]+) ]] && season="${BASH_REMATCH[1]}"
+[[ "$input_dir" =~ Dis[ck]\ ([0-9A-Z]+) ]] && disk="${BASH_REMATCH[1]}"
+rel_path="${input_dir//$base_ripping_dir\/}"
+base_input_name="${rel_path%%/*}"
+[ -n "$season" ] || die "Didn't get a season number, and couldn't parse one from the input path"
+[ -n "$disk" ] || die "Didn't get a disk number, and couldn't parse one from the input path"
+echo "Discovered from input: rel_path name='$rel_path' base_input_name='$base_input_name' season='$season' disk='$disk'"
 
 # Figure out where to put the configs
-show_config_dir="$config_dir/$show"
-main_config="$show_config_dir/main"
-echo -e "configs:\n  show: $show_config_dir\n  main: $main_config"
+main_config_dir="$config_dir/$base_input_name"
+main_config="$main_config_dir/main"
+echo -e "configs:\n  show: $main_config_dir\n  main: $main_config"
 
 # Ensure main file exists with correct content
-mkdir -p "$show_config_dir"
+mkdir -p "$main_config_dir"
 if [ -f "$main_config" ]; then
   grep "MAIN_NAME=\"$show_name\"" "$main_config" || die "Show name mismatch. Expected $show_name, but main has $(cat "$main_config")"
 else
@@ -74,6 +122,7 @@ probe() {
   PROBE_RESULT="$(ffprobe -probesize 42M -i "$1" 2>&1 | grep Stream)"
 }
 
+special_counter=0
 for f in "$input_dir"/*; do
   echo ""
   echo "Details of $f"
@@ -98,7 +147,16 @@ for f in "$input_dir"/*; do
       out_name="Season 0/$show_name s00e${episode_number}.mkv"
     elif [ "$t" = "Special Feature" ]; then
       read -p "Name: " answer
-      out_name="Season 0/$show_name s00e${season_number}${disk_number} - $answer.mkv"
+      if [ -n "$TV_SPECIALS_AS_MOVIE" ]; then
+        echo "Write this!"
+        exit 1
+      else
+        # Make up an "episode" number that'll be unique. Plex only goes by the episode number, not the name. If you make two specials with the same episode, it
+        # considers them two versions of the same thing.
+        id="$(printf '%0.2d%0.2d%0.2d' $season $disk $special_counter)"
+        out_name="Season 0/$show_name s00e${id} - $answer.mkv"
+        special_counter=$((special_counter+1))
+      fi
     else
       echo "Not yet written"
       exit 1
