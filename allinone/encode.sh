@@ -200,6 +200,12 @@ function encode_one {
         exit 1
     fi
 
+    # Also check for season in the output path! If the disks aren't ripped into the typical "tv show" structure,
+    # but have an OUTPUTNAME that puts the outputs in that structure, the output would have a season in it.
+    if [ -z "$SEASON" ] && [[ "$output_rel_path" =~ $rex ]]; then
+	SEASON="${BASH_REMATCH[1]}"
+    fi
+
     if [ -n "$SEASON" ]; then
         MAIN_TYPE_GUESS=tvshow
     else
