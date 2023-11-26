@@ -74,6 +74,10 @@ function encode_one {
     # Absolute path to the input file
     input_abs_path="$(realpath "$1")"
 
+    # Verify pixel format because I have to specify it for GPU encoding, and I'm not certain what happens if you change it.
+    in_pix_fmt="$(ffprobe -v error -select_streams v:0 -show_entries stream=pix_fmt -of default=noprint_wrappers=1:nokey=1 "$input_abs_path")"
+    [ "$in_pix_fmt" = "yuv420p" ] || die "Only handling pixel format yuv42p. Input has format '$in_pix_fmt'"
+
     # Now we have to figure out what config file to look for. The
     # input could be either a movie or a tv show. A movie file might
     # be:
@@ -395,7 +399,13 @@ EOF
     # ffmpeg will tell you what you did wrong.
     [ -z "$COMPLEXFILTER" ] || CMD+=(-filter_complex "$COMPLEXFILTER")
     CMD+=($MAPS -c copy)
-    [ -n "$VFILTERSTRING" ] && CMD+=("-filter:v:0" "$VFILTERSTRING")
+    if [ -n "$VFILTERSTRING" ]; then
+      if [ -n "$USE_GPU" ]; then
+        CMD+=("-filter:v:0" "hwdownload,format=nv12,$VFILTERSTRING,hwupload_cuda")
+      else
+        CMD+=("-filter:v:0" "$VFILTERSTRING")
+      fi
+    fi
 
     # Do real video encoding, or speed encode for checking the output?
     [ "$QUALITY" = "rough" ] && {
