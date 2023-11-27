@@ -86,9 +86,7 @@ EOF
 if [ "$format" = "video" ]; then
     debug "Sampling video file"
     debug " - $(date)"
-    echo "This is broken! Fix for new sample.sh input options!"
-    exit 1
-    DATA=$("$MYDIR/sample.sh" "$input" 10 | ffmpeg -hwaccel cuda -hwaccel_output_format cuda -i pipe: -filter:v idet -f rawvideo -y /dev/null 2>&1 | grep -i 'parsed_idet') || {
+    DATA=$("$MYDIR/sample.sh" -i "$input" -f pipe -m 10 | ffmpeg -i pipe: -filter:v idet -f rawvideo -y /dev/null 2>&1 | grep -i 'parsed_idet') || {
 	echo "ffmpeg failed to parse file: '$input'" >&2
 	exit 1
     }
