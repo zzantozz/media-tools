@@ -286,11 +286,20 @@ EOF
     [ -n "$CROPPING" ] && CONFIG_CROPPING="$CROPPING"
 
     if [ -z "$CONFIG_INTERLACED" ] || [ -z "$CONFIG_CROPPING" ]; then
-	echo "Analyzing..."
-	echo " - $(date)"
-	ANALYSIS=$("$TOOLSDIR/analyze.sh" "$input_abs_path" -k "$input_rel_path")
-	echo " - $(date)"
-	eval "$ANALYSIS"
+        analysis_cache_file="$CACHEDIR/analyze/$input_rel_path"
+        if [ -f "$analysis_cache_file" ]; then
+            echo "Using cached analysis: $analysis_cache_file"
+            ANALYSIS="$(cat "$analysis_cache_file")"
+        else
+            echo "Analyzing..."
+            echo " - $(date)"
+            ANALYSIS=$("$TOOLSDIR/analyze.sh" "$input_abs_path" -k "$input_rel_path")
+            mkdir -p "$(dirname "$analysis_cache_file")"
+              && echo "$ANALYSIS" > "$analysis_cache_file"
+              || die "Failed to write analysis to cache: $analysis_cache_file"
+            echo " - $(date)"
+        fi
+        eval "$ANALYSIS"
     fi
 
     [ -n "$CONFIG_INTERLACED" ] && [ -n "$INTERLACED" ] && [ "$CONFIG_INTERLACED" != "$INTERLACED" ] && {

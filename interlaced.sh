@@ -53,17 +53,17 @@ EOF
     exit 1
 }
 
-[ -d "$CACHEDIR" ] || die "CACHEDIR not set; atm, it's required by this script"
 
-input_without_slashes="${input//\//_}"
-input_without_leading_dot="${input_without_slashes/#./_}"
-CACHEKEY=${cache_key:-$input_without_leading_dot}
-CACHEFILE="$CACHEDIR/interlaced/$CACHEKEY"
-USECACHE=${USECACHE:-true}
-[ "$USECACHE" = true ] && {
+USECACHE=${USECACHE:-false}
+if [ "$USECACHE" = true ]; then
+    [ -d "$CACHEDIR" ] || die "CACHEDIR not set; atm, it's required by this script"
+    input_without_slashes="${input//\//_}"
+    input_without_leading_dot="${input_without_slashes/#./_}"
+    CACHEKEY=${cache_key:-$input_without_leading_dot}
+    CACHEFILE="$CACHEDIR/interlaced/$CACHEKEY"
     debug "Check cache file: $CACHEFILE"
     [ -f "$CACHEFILE" ] && cat "$CACHEFILE" && exit 0
-}
+fi
 
 [ "$format" = "video" ] || [ "$format" = "output" ] || {
     cat << EOF >&2
@@ -182,6 +182,8 @@ debug "Undetermined frames don't keep us from continuing."
     echo -e "$VALUES" >&2
     exit 1
 }
-mkdir -p "$(dirname "$CACHEFILE")"
-echo "$ANSWER1" > "$CACHEFILE" || true
+if [ "$USECACHE" = true ]; then
+  mkdir -p "$(dirname "$CACHEFILE")"
+  echo "$ANSWER1" > "$CACHEFILE" || true
+fi
 echo $ANSWER1

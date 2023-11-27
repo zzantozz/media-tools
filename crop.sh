@@ -47,12 +47,7 @@ EOF
     exit 1
 }
 
-[ -d "$CACHEDIR" ] || die "CACHEDIR doesn't exist: $CACHEDIR"
-
 BASENAME=$(basename "$input")
-CACHEFILE="$CACHEDIR/crop/$BASENAME"
-debug "Check cache file: $CACHEFILE"
-[ -f "$CACHEFILE" ] && cat "$CACHEFILE" && exit 0
 
 [ "$format" = "video" ] || [ "$format" = "output" ] || {
     cat << EOF >&2
