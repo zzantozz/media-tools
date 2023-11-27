@@ -81,8 +81,9 @@ else
     CMD+=("${INPUTS[@]}")
     CMD+=(-max_muxing_queue_size 1024)
     CMD+=(-filter_complex "$FILTER ${OUTPUTS}concat=n=$STREAMCOUNT[final]")
-    CMD+=(-map [final] -t "$TOTALLEN" -f matroska)
+    CMD+=(-map [final] -t "$TOTALLEN")
 fi
+CMD+=(-f matroska)
 if [ "$format" = pipe ]; then
   CMD+=(pipe:)
 else
