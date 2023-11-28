@@ -61,13 +61,17 @@ for f in "$input_dir"/*; do
   echo "$PROBE_RESULT"
   echo ""
   echo "What is this?"
-  select t in "Main Feature" "Behind The Scenes" "Deleted Scenes" Featurettes Interviews Scenes Shorts Trailers Other "skip it"; do
+  select t in "Main Feature" "Behind The Scenes" "Deleted Scenes" Featurettes Interviews Scenes Shorts Trailers Other "skip it" "Its own thing"; do
     if [ "$t" = "skip it" ]; then
       break
     fi
     config_file="$movie_config/$(basename "$f")"
     if [ "$t" = "Main Feature" ]; then
       out_name="$movie_name.mkv"
+    elif [ "$t" = "Its own thing" ]; then
+      read -p "Enter name: " answer
+      out_name="$answer.mkv"
+      additional_config="MAIN_NAME=\"$answer\""
     else
       read -p "Enter name: $t/" answer
       out_name="$t/$answer.mkv"
@@ -87,6 +91,7 @@ for f in "$input_dir"/*; do
     if [ -z "$answer" ] || [ "$answer" = y ]; then
       echo "OUTPUTNAME=\"$out_name\"" > "$config_file"
       echo "KEEP_STREAMS=$keep_streams" >> "$config_file"
+      [ -n "$additional_config" ] && echo "$additional_config" >> "$config_file"
       read -p "Any extras? [y/N] " answer
       if [ "$answer" = y ]; then
         echo "Enter extra lines to append to config, followed by ^D"
