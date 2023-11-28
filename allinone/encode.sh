@@ -294,8 +294,8 @@ EOF
             echo "Analyzing..."
             echo " - $(date)"
             ANALYSIS=$("$TOOLSDIR/analyze.sh" "$input_abs_path" -k "$input_rel_path")
-            mkdir -p "$(dirname "$analysis_cache_file")"
-              && echo "$ANALYSIS" > "$analysis_cache_file"
+            mkdir -p "$(dirname "$analysis_cache_file")" \
+              && echo "$ANALYSIS" > "$analysis_cache_file" \
               || die "Failed to write analysis to cache: $analysis_cache_file"
             echo " - $(date)"
         fi
