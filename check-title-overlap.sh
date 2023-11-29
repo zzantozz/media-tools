@@ -9,6 +9,15 @@
 # Call with the output of 'makemkvcon -r info disc:0'. You can provide the output either on stdin or by
 # calling this script with the name of a file that contains the output.
 
+die() {
+  echo "ERROR: $1" >&2
+  exit 1
+}
+
+[ -f "$1" ] && input="$1"
+[ -d "$1" ] && input="$1/_info"
+[ -z "$1" ] || [ -f "$input" ] || die "If you provide an input, it must be a file or a directory containing a file named '_info'; was: '$1'"
+
 contains() { arr=($1); item="$2"; for x in "${arr[@]}"; do if [ "$x" = "$item" ]; then return 0; fi; done; return 1; }
 contains_all() { items=($2); for item in "${items[@]}"; do if ! contains "$1" "$item"; then return 1; fi; done; return 0; }
 
@@ -25,7 +34,7 @@ while read -r line; do
     time="${BASH_REMATCH[2]}"
     duration_map["$title"]="$time"
   fi
-done < "${1:-/dev/stdin}"
+done < "${input:-/dev/stdin}"
 
 echo "Got ${#segment_map[@]} titles"
 
