@@ -14,7 +14,7 @@ die() {
 }
 
 usage() {
-  echo "Usage: $0 -i <input name> -n <movie name> [-c <config dir>]" >&2
+  echo "Usage: $0 -i <input name> [-n <movie name>] [-c <config dir>]" >&2
   exit 1
 }
 
@@ -32,7 +32,7 @@ while getopts "i:n:b:c:" opt; do
   esac
 done
 
-if [ -z "$input_dir" ] || [ -z "$movie_name" ]; then
+if [ -z "$input_dir" ]; then
   usage
 fi
 
@@ -42,6 +42,16 @@ fi
 
 if ! ([ -d "$config_dir" ] && [ "config" = "$(basename "$config_dir")" ] && [ "data" = "$(basename "$(dirname "$config_dir")")" ]); then
   die "config dir should point at a config dir in the media toolset, was: $config_dir"
+fi
+
+if [ -z "$movie_name" ]; then
+  movie_name_guess="$(basename "$input_dir")"
+  read -p "Movie name? [$movie_name_guess] " answer
+  if [ -z "$answer" ]; then
+    movie_name="$movie_name_guess"
+  else
+    movie_name="$answer"
+  fi
 fi
 
 ripped_name="$(basename "$input_dir")"
