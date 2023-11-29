@@ -78,7 +78,9 @@ fi
 if CROPPING=$("$MYDIR/crop.sh" -i "$tmp_dir/analyze_data" -f output); then
     debug "Cropping: $CROPPING"
     echo "CROPPING=$CROPPING"
-    [ $USECACHE = true ] && echo "CROPPING=$CROPPING" >> "$CACHEFILE"
+    if [ $USECACHE = true ]; then
+        echo "CROPPING=$CROPPING" >> "$CACHEFILE"
+    fi
 else
     debug "Crop detect failed, but continuing, since it could be set manually"
 fi
