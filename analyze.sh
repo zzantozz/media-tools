@@ -39,15 +39,15 @@ die() {
     exit 1
 }
 
-[ -d "$CACHEDIR" ] || die "CACHEDIR not set; atm, it's required by this script"
 
 MYDIR="$(dirname "$0")"
-input_without_slashes="${input//\//_}"
-input_without_leading_dot="${input_without_slashes/#./_}"
-CACHEKEY=${cache_key:-$input_without_leading_dot}
-CACHEFILE="$CACHEDIR/analyze/$CACHEKEY"
 USECACHE=${USECACHE:-false}
 [ "$USECACHE" = true ] && {
+    [ -d "$CACHEDIR" ] || die "CACHEDIR not set; atm, it's required by this script"
+    input_without_slashes="${input//\//_}"
+    input_without_leading_dot="${input_without_slashes/#./_}"
+    CACHEKEY=${cache_key:-$input_without_leading_dot}
+    CACHEFILE="$CACHEDIR/analyze/$CACHEKEY"
     debug "Check cache file: $CACHEFILE"
     [ -f "$CACHEFILE" ] && cat "$CACHEFILE" && exit 0
 }
