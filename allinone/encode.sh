@@ -238,6 +238,12 @@ function encode_one {
 
     output_abs_path="$base_output_dir/$output_rel_path"
     output_tmp_path="$base_output_dir/$(dirname "$output_rel_path")/$(basename "$output_rel_path").part"
+
+    if [ -n "$ONLY_MAP" ]; then
+        echo "IN: $input_abs_path OUT: $output_abs_path"
+        return 0
+    fi
+
     trap 'rm -f "$output_tmp_path"' EXIT
 
     DONEFILE="$DONEDIR/$output_rel_path"
