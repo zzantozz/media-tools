@@ -76,6 +76,7 @@ for f in "$input_dir"/*; do
       break
     fi
     config_file="$movie_config/$(basename "$f")"
+    unset additional_config
     if [ "$t" = "Main Feature" ]; then
       out_name="$movie_name.mkv"
     elif [ "$t" = "Its own thing" ]; then
