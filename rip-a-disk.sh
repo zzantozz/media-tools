@@ -75,7 +75,8 @@ bash "$script_dir/check-title-overlap.sh" "$tmp_info"
 
 [ -n "$disk_name" ] || die "Unable to find disk name in disk info"
 disk_name="${disk_name/\'/}"
-disk_name="${disk_name/:/ -}"
+disk_name="${disk_name//:/ -}"
+disk_name="$(echo "$disk_name" | tr -s ' ')"
 echo
 echo "Disk name will be '$disk_name'"
 echo
