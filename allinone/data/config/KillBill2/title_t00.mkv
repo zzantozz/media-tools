@@ -1,2 +1,3 @@
 OUTPUTNAME="Kill Bill 2.mkv"
 KEEP_STREAMS=all
+FFMPEG_EXTRA_OPTIONS="-disposition:s:1 forced"
