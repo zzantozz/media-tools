@@ -15,7 +15,7 @@ die() {
 }
 
 [ -f "$1" ] && input="$1"
-[ -d "$1" ] && input="$1/_info"
+[ -d "$1" ] && input="$1/_info_30"
 [ -z "$1" ] || [ -f "$input" ] || die "If you provide an input, it must be a file or a directory containing a file named '_info'; was: '$1'"
 
 contains() { arr=($1); item="$2"; for x in "${arr[@]}"; do if [ "$x" = "$item" ]; then return 0; fi; done; return 1; }
