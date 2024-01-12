@@ -127,7 +127,17 @@ probe() {
 
 special_counter=0
 for f in "$input_dir"/*; do
+  if [[ "$(basename "$f")" =~ ^_info ]]; then
+    continue
+  fi
+  config_file="$config_dir/$rel_path/$(basename "$f")"
   echo ""
+  if [ -f "$config_file" ]; then
+    echo "Config file for $f exists at $config_file"
+    echo "Contents:"
+    cat "$config_file"
+    echo ""
+  fi
   echo "Details of $f"
   echo ""
   probe "$f"
@@ -177,7 +187,6 @@ for f in "$input_dir"/*; do
     fi
     read -p "Encode '$f' as '$out_name' with streams $keep_streams? [Y/n] " answer
     if [ -z "$answer" ] || [ "$answer" = y ]; then
-      config_file="$config_dir/$rel_path/$(basename "$f")"
       mkdir -p "$(dirname "$config_file")"
       echo "Writing to $config_file"
       echo "OUTPUTNAME=\"$out_name\"" > "$config_file"
