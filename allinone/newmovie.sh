@@ -46,6 +46,9 @@ fi
 
 if [ -z "$movie_name" ]; then
   movie_name_guess="$(basename "$input_dir")"
+  nounders="${movie_name_guess//_/ }"
+  lcase=(${nounders,,})
+  movie_name_guess="${lcase[@]^}"
   read -p "Movie name? [$movie_name_guess] " answer
   if [ -z "$answer" ]; then
     movie_name="$movie_name_guess"
