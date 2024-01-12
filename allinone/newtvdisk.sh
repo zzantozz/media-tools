@@ -62,7 +62,7 @@ EOF
   exit 1
 }
 
-while getopts "i:n:c:s:d:" opt; do
+while getopts "i:n:c:s:d:h" opt; do
   case "$opt" in
     i)
       input_name="$OPTARG"
@@ -79,6 +79,9 @@ while getopts "i:n:c:s:d:" opt; do
     c)
       config_dir="$OPTARG"
       ;;
+    h)
+     usage
+     ;;
   esac
 done
 
