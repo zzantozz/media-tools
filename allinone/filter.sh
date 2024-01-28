@@ -26,17 +26,26 @@ function debug {
 [ -n "$FRAMERATE" ] || FRAMERATE=23.98
 FILE="$1"
 shift
-while getopts "v:" opt; do
+while getopts "v:c:" opt; do
     case $opt in
 	v)
-	    EXTRA_VFILTERS=$OPTARG
+	    EXTRA_VFILTERS="$OPTARG"
 	    ;;
+        c)
+            CONCAT_FILE="$OPTARG"
+            ;;
 	*)
 	    echo "Invalid option to $0" >&2
 	    exit 1
 	    ;;
     esac
 done
+
+[ -f "$CONCAT_FILE" ] && {
+  debug "Removing existing concat file: $CONCAT_FILE"
+  rm "$CONCAT_FILE"
+}
+
 debug "Using extra video filters from command line: $EXTRA_VFILTERS"
 BASENAME="$(basename "$FILE")"
 MOVIEDIR="$(basename $(dirname "$FILE"))"
@@ -91,12 +100,45 @@ CONFIGFILE="$DATADIR/config/$MOVIEDIR/$BASENAME"
 debug "Using config file $CONFIGFILE"
 
 source "$CONFIGFILE"
+
+if [ -z "$CUT_STREAMS" ]; then
+  # New feature - Don't require CUT_STREAMS. Instead, discover the streams via probe and
+  # configure filtering for the video and audio streams. Ignore subtitle streams because
+  # they can't be sliced up the same way. Instead, we can write a concat file that can
+  # be used for them.
+  debug "No CUT_STREAMS configured, attempting to determine automatically"
+  CUT_STREAMS=()
+  while read -r line; do
+    if [[ "$line" =~ Stream\ #(.:.)\([^\)]*\):\ (Video|Audio|Subtitle): ]]; then
+      stream="${BASH_REMATCH[1]}"
+      stream_type="${BASH_REMATCH[2]}"
+      debug "Stream $stream type is $stream_type"
+      case "$stream_type" in
+        Video|Audio)
+          debug "Add stream $stream to CUT_STREAMS"
+          CUT_STREAMS+=("$stream")
+          ;;
+        Subtitle)
+          :
+          ;;
+        *)
+          echo "Stream $stream has unkown type $stream_type" >&2
+          exit 1
+          ;;
+      esac
+    else
+      echo "Couldn't detect stream type" >&2
+      exit 1
+    fi
+  done <<<"$(ffprobe -i "$FILE" 2>&1 | grep Stream)"
+fi
+
 [ -n "$CUT_STREAMS" ] || {
 	echo "No CUT_STREAMS in config file $CONFIGFILE" >&2
 	echo "You need to configure which streams to cut for the filtering." >&2
 	exit 1
 }
-debug "Streams to cut: ${CUT_STREAMS[@]}"
+debug "Streams to cut: ${CUT_STREAMS[*]}"
 
 # Converts hh:mm:ss.SSS to decimal seconds
 function ts_to_s {
@@ -231,6 +273,12 @@ while [ $I -lt "${#SEGMENTS[@]}" ]; do
         START_S="${SEGMENT[0]}"
         END_S="${SEGMENT[1]}"
         debug "Segment: $START_S - $END_S with modifiers: ${MODS[@]}"
+        if [ -n "$CONCAT_FILE" ]; then
+          echo "file '$FILE'" >> "$CONCAT_FILE"
+          echo "inpoint $START_S" >> "$CONCAT_FILE"
+          [ "$END_S" = end ] || echo "outpoint $END_S" >> "$CONCAT_FILE"
+          echo "" >> "$CONCAT_FILE"
+        fi
         STREAMCOUNT="0"
         for STREAM in "${CUT_STREAMS[@]}"; do
                 [ "$STREAM" = "0:0" ] && AORV="" || AORV="a"

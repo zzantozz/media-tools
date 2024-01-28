@@ -339,11 +339,13 @@ EOF
     debug "Quality: $VQ"
 
     if [ -f "$DATADIR/cuts/$input_rel_path" ]; then
-	FILTERCMD=("$script_dir/filter.sh" "$input_abs_path")
+        concat_cache_file="$CACHEDIR/concat/$input_rel_path"
+	FILTERCMD=("$script_dir/filter.sh" "$input_abs_path" -c "$concat_cache_file")
 	EXTRAS=()
 	[ "$INTERLACED" = "interlaced" ] && EXTRAS+=("yadif")
 	[ "$CROPPING" = none ] || EXTRAS+=("crop=$CROPPING")
 	[ -n "$EXTRAS" ] && FILTERCMD+=(-v "$(IFS=,; printf "%s" "${EXTRAS[*]}")")
+        mkdir -p "$(dirname "$concat_cache_file")"
 	COMPLEXFILTER=$("${FILTERCMD[@]}") || {
 	    echo "filter.sh failed to determine complex filter string" >&2
 	    exit 1
@@ -360,13 +362,40 @@ EOF
     }
     MAPS=""
     if [ -n "$COMPLEXFILTER" ]; then
-	debug "have complex filter; mapping this way"
-	NMAPS="${#CUT_STREAMS[@]}"
-	NMAPS=$((NMAPS-1))
-	ALLOUTS=($OUTSTRING)
-	for I in $(seq 0 $NMAPS); do
-	    MAPS="$MAPS -map ${ALLOUTS[$I]}"
-	done
+      debug "have complex filter; mapping this way"
+      s_idx=0
+      ALLOUTS=($OUTSTRING)
+      while read -r line; do
+        if [[ "$line" =~ Stream\ #(.:.)\([^\)]*\):\ (Video|Audio|Subtitle): ]]; then
+          stream="${BASH_REMATCH[1]}"
+          stream_type="${BASH_REMATCH[2]}"
+          debug "Stream $stream type is $stream_type"
+          case "$stream_type" in
+            Video|Audio)
+              debug "Map stream $stream"
+              MAPS="$MAPS -map ${ALLOUTS[$s_idx]}"
+              ;;
+            Subtitle)
+              MAPS="$MAPS -map 1:$s_idx"
+              ;;
+            *)
+              echo "Stream $stream has unkown type $stream_type" >&2
+              exit 1
+              ;;
+          esac
+        else
+          echo "Couldn't detect stream type" >&2
+          exit 1
+        fi
+        s_idx=$((s_idx+1))
+      done <<<"$(ffprobe -i "$input_abs_path" 2>&1 | grep Stream)"
+
+
+#	NMAPS="${#CUT_STREAMS[@]}"
+#	NMAPS=$((NMAPS-1))
+#	for I in $(seq 0 $NMAPS); do
+#	    MAPS="$MAPS -map ${ALLOUTS[$I]}"
+#	done
     else
 	debug "no complex filter; mapping that way"
 	# Let KEEP_STREAMS=all mean map every stream. With ffmpeg and one input, a "-map 0" will do that.
@@ -405,6 +434,11 @@ EOF
 
     [ -n "$USE_GPU" ] && ! [ "$NEVER_GPU" ] && CMD+=(-hwaccel cuda -hwaccel_output_format cuda)
     CMD+=(-hide_banner -y -i "$input_abs_path")
+
+    # If doing cuts, use the concat file to attach cut subtitles from the input file
+    if [ -n "$COMPLEXFILTER" ]; then
+      CMD+=(-safe 0 -f concat -i "$concat_cache_file")
+    fi
 
     # This because several videos end up failing with the "Too many packets buffered for output stream XXX" error.
     # I don't think this will cause any problems.
