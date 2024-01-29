@@ -99,6 +99,11 @@ elif [ "$format" = "output" ]; then
     debug "$DATA"
 fi
 
+# I think a newer version of ffmpeg has started emitting additional, bogus parsed_idet lines. They have 0 for all the counts.
+# Filter them out of the output.
+
+DATA="$(echo "$DATA" | grep -Ev 'TFF:\s+0\s+BFF:\s+0\s+Progressive:\s+0\s+Undetermined:\s+0')"
+
 RE1="Single frame detection: TFF: *([[:digit:]]+) *BFF: *([[:digit:]]+) *Progressive: *([[:digit:]]+) *Undetermined: *([[:digit:]]+)"
 RE2="Multi frame detection: TFF: *([[:digit:]]+) *BFF: *([[:digit:]]+) *Progressive: *([[:digit:]]+) *Undetermined: *([[:digit:]]+)"
 
@@ -119,6 +124,13 @@ debug "tff: $TFF1 bff: $BFF1 progressive: $PROG1 undetermined: $UNDET1"
 debug "tff: $TFF2 bff: $BFF2 prog: $PROG2 undetermined: $UNDET2"
 
 VALUES="Single frame: tff=$TFF1 bff=$BFF1 progressive=$PROG1 undetermined=$UNDET1\nDouble frame: tff=$TFF2 bff=$BFF2 progressive=$PROG2 undetermined=$UNDET2"
+
+if [ "$TFF1" = 0 ] && [ "$BFF1" = 0 ] && [ "$PROG1" = 0 ]; then
+  die "Got 0 for all single frame counts"
+fi
+if [ "$TFF2" = 0 ] && [ "$BFF2" = 0 ] && [ "$PROG2" = 0 ]; then
+  die "Got 0 for all double frame counts"
+fi
 
 # If progressive frames greatly outweight interlaced, it's progressive
 [ $PROG1 -gt $((100*(TFF1+BFF1))) ] && {
@@ -156,20 +168,20 @@ debug "Undetermined frames don't keep us from continuing."
 # If we don't have an answer yet but made it past the "undetermined" check, then whichever frame count is biggest wins.
 [ -z "$ANSWER1" ] && {
     if [ $TFF1 -gt $PROG1 ] || [ $BFF1 -gt $PROG1 ]; then
-	debug "Decided single=interlaced because there are more interlaced frames than progressive."
+	debug "Decided single=interlaced because there are more interlaced frames ($TFF1/$BFF1) than progressive ($PROG1)."
 	ANSWER1=interlaced
     else
-	debug "Decided single=progressive because there are more progressive frames than interlaced."
+	debug "Decided single=progressive because there are more progressive ($PROG1) frames than interlaced ($TFF1/$BFF1)."
 	ANSWER1=progressive
     fi
 }
 
 [ -z "$ANSWER2" ] && {
     if [ $TFF2 -gt $PROG2 ] || [ $BFF2 -gt $PROG2 ]; then
-	debug "Decided multi=interlaced because there are more interlaced frames than progressive."
+	debug "Decided multi=interlaced because there are more interlaced ($TFF2/$BFF2) frames than progressive ($PROG2)."
 	ANSWER2=interlaced
     else
-	debug "Decided multi=progressive because there are more progressive frames than interlaced."
+	debug "Decided multi=progressive because there are more progressive frames ($PROG2) than interlaced ($TFF2/$BFF2)."
 	ANSWER2=progressive
     fi
 }
