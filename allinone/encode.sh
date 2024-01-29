@@ -192,8 +192,8 @@ function encode_one {
         # This only does 2-digit season and episode; probably need to
         # allow for three at some point. Do it always? Or based on
         # config?
-        padded_season="$(printf %.2d $SEASON)"
-        padded_episode="$(printf %.2d $EPISODE)"
+        padded_season="$(printf %.2d ${SEASON#0})"
+        padded_episode="$(printf %.2d ${EPISODE#0})"
         output_rel_path="$MAIN_NAME/Season $SEASON/$MAIN_NAME s${padded_season}e${padded_episode}.mkv"
     else
         echo "Missing fields from config: $config_file" >&2
