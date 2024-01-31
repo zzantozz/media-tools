@@ -2,7 +2,7 @@
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 export script_dir
-echo "Running from $script_dir"
+echo "Running from $script_dir" >&2
 
 # Base directories that contain details of media processing. "cache" is for temporary things. These shouldn't be committed.
 # "data" is where information is stored about how to process specific files. This should be committed. I normally keep these
@@ -22,17 +22,17 @@ export LOGDIR
 CONFIGDIR=${CONFIGDIR:-"$DATADIR/config"}
 export CONFIGDIR
 # Directory to scan for raw mkv's ripped from disc
-INPUTDIR=${INPUTDIR:-"/media/plex-media-2/ripping/media-in"}
+INPUTDIR=${INPUTDIR:-"/mnt/l/ripping"}
 export INPUTDIR
 # Root directory of movies library, where final transcoded movies go, possibly in a subdirectory to organize
 # related items the way Plex likes them.
-MOVIESDIR=${MOVIESDIR:-"/media/plex-media/movies"}
+MOVIESDIR=${MOVIESDIR:-"/mnt/plex-media/encoded/movies"}
 export MOVIESDIR
 # Root directory of tv shows library, where final transcoded shows go.
-TVSHOWSDIR=${TVSHOWSDIR:-"/media/plex-media/tv-shows"}
+TVSHOWSDIR=${TVSHOWSDIR:-"/mnt/plex-media/encoded/tv-shows"}
 export TVSHOWSDIR
 # Directory holding general ripping tools
-TOOLSDIR=${TOOLSDIR:-"/media/plex-media-2/ripping/tools"}
+TOOLSDIR=${TOOLSDIR:-"$script_dir/.."}
 export TOOLSDIR
 
 die() {
