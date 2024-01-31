@@ -272,18 +272,15 @@ function encode_one {
 
     details_file="$DATADIR/details/$input_rel_path"
     if [ ! -f "$details_file" ]; then
-        echo "Gathering title details including sha1sum, may take a while"
-        input_sha1=$(sha1sum "$input_abs_path" | awk '{print $1}')
+        debug "Gathering title details"
         input_size=$(du -b "$input_abs_path" | awk '{print $1}')
-
-        echo "Size: $input_size"
-        echo "Checksum: $input_sha1"
+        debug "Size: $input_size"
+        debug "Duration: $input_length"
         echo "Recording details to $details_file"
         mkdir -p "$(dirname "$details_file")"
         cat <<EOF > "$details_file"
 ORIGINAL_DURATION=$input_length
 ORIGINAL_SIZE=$input_size
-ORIGINAL_CHECKSUM=sha1:$input_sha1
 EOF
     fi
 
