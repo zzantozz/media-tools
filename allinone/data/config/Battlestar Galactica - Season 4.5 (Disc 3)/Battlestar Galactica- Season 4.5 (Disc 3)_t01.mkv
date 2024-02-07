@@ -1,3 +1,4 @@
 OUTPUTNAME="Featurettes/S4D03 Featurettes 4.5.mkv"
 KEEP_STREAMS=all
 MAIN_TYPE=movie
+INTERLACED=progressive
