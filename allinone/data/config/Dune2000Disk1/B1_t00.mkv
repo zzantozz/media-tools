@@ -1,2 +1,6 @@
 OUTPUTNAME="Season 01/Frank Herberts Dune (2000) s01e01.mkv"
 KEEP_STREAMS=all
+# The video really seems progressive, but I tried that, and there
+# are a handful of scenes, mostly with panning, where the interlacing
+# is painfully visible.
+INTERLACED=interlaced

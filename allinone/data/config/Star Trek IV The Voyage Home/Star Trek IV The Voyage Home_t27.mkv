@@ -1,2 +1,3 @@
 OUTPUTNAME="Featurettes/Roddenberry Scrapbook.mkv"
 KEEP_STREAMS=all
+INTERLACED=interlaced

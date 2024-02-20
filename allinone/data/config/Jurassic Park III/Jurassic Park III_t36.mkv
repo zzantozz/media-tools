@@ -1,2 +1,3 @@
 OUTPUTNAME="Behind The Scenes/Behind The Scenes 10.mkv"
 KEEP_STREAMS=all
+INTERLACED=progressive
