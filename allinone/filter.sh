@@ -126,11 +126,13 @@ if [ -z "$CUT_STREAMS" ]; then
           exit 1
           ;;
       esac
+    elif [[ "$line" =~ Video:\ mjpeg\ \(Baseline\).*\(attached\ pic\) ]]; then
+      :
     else
       echo "Couldn't detect stream type" >&2
       exit 1
     fi
-  done <<<"$(ffprobe -i "$FILE" 2>&1 | grep Stream)"
+  done <<<"$(ffprobe -probesize 100M -i "$FILE" 2>&1 | grep Stream)"
 fi
 
 [ -n "$CUT_STREAMS" ] || {
