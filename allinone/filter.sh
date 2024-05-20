@@ -48,7 +48,7 @@ done
 
 debug "Using extra video filters from command line: $EXTRA_VFILTERS"
 BASENAME="$(basename "$FILE")"
-MOVIEDIR="$(basename $(dirname "$FILE"))"
+MOVIEDIR="$(basename "$(dirname "$FILE")")"
 CUTS_FILE="$DATADIR/cuts/$MOVIEDIR/$BASENAME"
 
 [ -f "$CUTS_FILE" ] || {
