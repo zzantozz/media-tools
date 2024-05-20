@@ -363,6 +363,7 @@ EOF
 	exit 1
     }
     MAPS=""
+    encodings=()
     if [ -n "$COMPLEXFILTER" ]; then
       debug "have complex filter; mapping this way"
       s_idx=0
@@ -371,14 +372,21 @@ EOF
         if [[ "$line" =~ Stream\ #(.:.+)\([^\)]*\):\ (Video|Audio|Subtitle): ]]; then
           stream="${BASH_REMATCH[1]}"
           stream_type="${BASH_REMATCH[2]}"
-          debug "Stream $stream type is $stream_type"
           case "$stream_type" in
-            Video|Audio)
-              debug "Map stream $stream"
+            Video)
+              debug "Map stream $stream as video"
               MAPS="$MAPS -map ${ALLOUTS[$s_idx]}"
+              # Video encoding settings are handled later, though it assumes only a single video stream.
+              ;;
+            Audio)
+              debug "Map stream $stream as audio"
+              MAPS="$MAPS -map ${ALLOUTS[$s_idx]}"
+              encodings+=("-c:$s_idx" "ac3" "-ac:$s_idx" "6" "-b:$s_idx" "384k")
               ;;
             Subtitle)
+              debug "Map stream $stream as subtitle"
               MAPS="$MAPS -map 1:$s_idx"
+              # No encoding for subtitle streams. They're handled by the concat file.
               ;;
             *)
               echo "Stream $stream has unkown type $stream_type" >&2
@@ -475,10 +483,10 @@ EOF
 	CMD+=(-c:1 ac3 -ac:1 6 -b:1 384k)
     }
 
-    # If cutting is happening, stream 1 should be the best audio for the purpose and has to be transcoded
-    # due to the cutting.
+    # If cutting is happening, encodings to apply will have been calculated previously. You can't do any stream copies when using a
+    # complex filtergraph, so every stream needs an encoding.
     [ -n "$COMPLEXFILTER" ] && {
-	CMD+=(-c:1 ac3 -ac:1 6 -b:1 384k)
+      CMD=("${CMD[@]}" "${encodings[@]}")
     }
 
     CMD+=(-metadata:s:0 "encoded_by=My smart encoder script")
