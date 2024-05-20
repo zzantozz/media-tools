@@ -343,6 +343,11 @@ EOF
 	[ "$CROPPING" = none ] || EXTRAS+=("crop=$CROPPING")
 	[ -n "$EXTRAS" ] && FILTERCMD+=(-v "$(IFS=,; printf "%s" "${EXTRAS[*]}")")
         mkdir -p "$(dirname "$concat_cache_file")"
+        printable=""
+        for x in "${FILTERCMD[@]}"; do
+          printable+="'$x' "
+        done
+        debug "Calculate filter args with: $printable"
 	COMPLEXFILTER=$("${FILTERCMD[@]}") || {
 	    echo "filter.sh failed to determine complex filter string" >&2
 	    exit 1
