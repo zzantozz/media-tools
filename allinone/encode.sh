@@ -368,7 +368,7 @@ EOF
       s_idx=0
       ALLOUTS=($OUTSTRING)
       while read -r line; do
-        if [[ "$line" =~ Stream\ #(.:.)\([^\)]*\):\ (Video|Audio|Subtitle): ]]; then
+        if [[ "$line" =~ Stream\ #(.:.+)\([^\)]*\):\ (Video|Audio|Subtitle): ]]; then
           stream="${BASH_REMATCH[1]}"
           stream_type="${BASH_REMATCH[2]}"
           debug "Stream $stream type is $stream_type"
@@ -385,12 +385,14 @@ EOF
               exit 1
               ;;
           esac
+        elif [[ "$line" =~ mjpeg\ \(Baseline\).*\(attached\ pic\) ]]; then
+          :
         else
           echo "Couldn't detect stream type" >&2
           exit 1
         fi
         s_idx=$((s_idx+1))
-      done <<<"$(ffprobe -i "$input_abs_path" 2>&1 | grep Stream)"
+      done <<<"$(ffprobe -probesize 100M -i "$input_abs_path" 2>&1 | grep Stream)"
 
 
 #	NMAPS="${#CUT_STREAMS[@]}"
