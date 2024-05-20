@@ -109,7 +109,7 @@ if [ -z "$CUT_STREAMS" ]; then
   debug "No CUT_STREAMS configured, attempting to determine automatically"
   CUT_STREAMS=()
   while read -r line; do
-    if [[ "$line" =~ Stream\ #(.:.)\([^\)]*\):\ (Video|Audio|Subtitle): ]]; then
+    if [[ "$line" =~ Stream\ #(.:.+)\([^\)]*\):\ (Video|Audio|Subtitle): ]]; then
       stream="${BASH_REMATCH[1]}"
       stream_type="${BASH_REMATCH[2]}"
       debug "Stream $stream type is $stream_type"
