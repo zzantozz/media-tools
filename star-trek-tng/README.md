@@ -29,9 +29,12 @@ with a weird, swirly, pink background. No idea what it is, but I don't need it.
 
 - `tng-cat-previews` - This isn't necessarily something to filter out. It's TV spots/teasers for upcoming
 episodes, like "Next time on Star Trek...". They're all about 32-34 seconds in length. I didn't encode them
-individually, because who would want to go through 177 of these things? I might concatenate them all into
-one video of all of them in chronilogical order and stick in the "special features" section because that
-could be interesting.
+individually, because who would want to go through 177 of these things? This command successfully concatenates
+them all into one video because it might be interesting to have it as a special feature:
+
+    ```
+     ripping_dir=/mnt/l/ripping/ && rm -f concats && ( cat tng-cat-previews | cut -d ' ' -f 3- | sort | grep '^./STAR' && cat tng-cat-previews | cut -d ' ' -f 3- | sort | grep -v '^./STAR' ) | sed "s#^./#$ripping_dir/#" | xargs -I {} bash -c "echo \"file '{}'\" >> concats" && ffmpeg -f concat -safe 0 -i concats -c copy /mnt/plex-media/encoded/out.mkv
+    ```
 
 I built the initial file of all non-episode titles like this:
 
