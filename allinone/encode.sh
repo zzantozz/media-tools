@@ -222,7 +222,13 @@ function encode_one {
     if [ "$MAIN_TYPE" = movie ]; then
         base_output_dir="$MOVIESDIR"
     elif [ "$MAIN_TYPE" = tvshow ] || [ "$MAIN_TYPE" = tv_show ]; then
-        base_output_dir="$TVSHOWSDIR"
+        # If it's a tv special, we might want to store it under a movie for organization
+        if [ "$SPECIAL_TYPE" = movie ] && [ -n "$OUTPUTNAME" ] && ! [[ "$OUTPUTNAME" =~ $MAIN_NAME ]]; then
+            base_output_dir="$MOVIESDIR"
+            [ -f "$base_output_dir/$MAIN_NAME/$MAIN_NAME.mkv" ] || die "Need a bogus movie file to support tv specials as movies!"
+        else
+            base_output_dir="$TVSHOWSDIR"
+        fi
     else
         die "No MAIN_TYPE configured, and couldn't determine one."
     fi
