@@ -32,3 +32,9 @@ length of 30 seconds and this for title selection:
 ```
 -sel:all,+sel:(favlang|nolang),-sel:mvcvideo,=100:all,-10:favlang,+sel:attachment
 ```
+
+note: Here's how to update the videos encoded fast with gpu encoder to get better quality:
+
+```
+CACHEDIR=/mnt/d/ripping-work ONLY_MAP=true media-tools/allinone/encode.sh 2>&1 | tr '\n' '\0' | xargs -0 -I {} bash -c 'if ! [[ "{}" =~ IN:\ (.*)\ OUT:\ (.*) ]]; then echo "Skipping: {}"; else in="${BASH_REMATCH[1]}"; out="${BASH_REMATCH[2]}"; if ! [ -f "$out" ] || ffprobe -i "$out" 2>&1 | grep hevc_nvenc >/dev/null; then echo " *** re-encode $in"; CACHEDIR=/mnt/d/ripping-work/cache media-tools/allinone/encode.sh "$in"; else echo "already converted"; fi; fi'
+```
