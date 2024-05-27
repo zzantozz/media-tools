@@ -181,9 +181,9 @@ function encode_one {
     # Wait, as a special case, tv show inputs will likely have the
     # season in the input path, so look for it there if it's not in
     # the config.
-    rex="/Season ([[:digit:].]+)/"
+    rex="[/ ](Season|SEASON) ([[:digit:].]+)[/ ]"
     if [ -z "$SEASON" ] && [[ "$input_rel_path" =~ $rex ]]; then
-	SEASON="${BASH_REMATCH[1]}"
+	SEASON="${BASH_REMATCH[2]}"
     fi
 
     if [ -n "$OUTPUTNAME" ]; then
