@@ -67,6 +67,9 @@ probe() {
 }
 
 for f in "$input_dir"/*; do
+  if [[ "$f" =~ /_info ]]; then
+    continue
+  fi
   echo ""
   echo "Details of $f"
   echo ""
