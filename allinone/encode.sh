@@ -2,7 +2,6 @@
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 export script_dir
-echo "Running from $script_dir" >&2
 
 # Base directories that contain details of media processing. "cache" is for temporary things. These shouldn't be committed.
 # "data" is where information is stored about how to process specific files. This should be committed. I normally keep these
@@ -64,6 +63,8 @@ function debug {
     return 0
 }
 export -f debug
+
+debug "Running from $script_dir"
 
 function encode_one {
     [ -f "$1" ] || {
