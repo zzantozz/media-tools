@@ -1,0 +1,11 @@
+##
+# This is a shared file to be used by multiple scripts here. It's
+# for holding functions that would otherwise be repeated across
+# multiple scripts. It should be sourced from any script that
+# wants to use these shared functions.
+#
+
+die() {
+  echo "ERROR: $1" >&2
+  exit 1
+}

@@ -1,0 +1,11 @@
+##
+# This is meant to be a shared config file that all the scripts here can use. It's
+# new atm, and only used by one, new script to see how it works. It should be
+# sourced at the beginning of any script, and then the script should validate
+# that the settings are appropriate for it. There probably won't be any validation
+# in this script because the validity of each setting is dependent on the script
+# being run.
+#
+
+input_dir="${INPUTDIR:-/mnt/l/ripping}"
+INPUTDIR="$input_dir"
