@@ -18,6 +18,11 @@ die() {
 [ -d "$1" ] && input="$1/_info_30"
 [ -z "$1" ] || [ -f "$input" ] || die "If you provide an input, it must be a file or a directory containing a file named '_info'; was: '$1'"
 
+if grep 'CINFO:1,6206,"DVD disc"' "$input" &>/dev/null; then
+  echo "Checking title overlap only works on blu-rays; exiting without doing anything."
+  exit 0
+fi
+
 contains() { arr=($1); item="$2"; for x in "${arr[@]}"; do if [ "$x" = "$item" ]; then return 0; fi; done; return 1; }
 contains_all() { items=($2); for item in "${items[@]}"; do if ! contains "$1" "$item"; then return 1; fi; done; return 0; }
 
