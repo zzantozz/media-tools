@@ -6,7 +6,8 @@
 # movie config file, and it steps through each file in the input dir and prompts for details of each. Default
 # to all streams. After collecting information about the title, it writes out a data file for it.
 
-config_dir="/home/ryan/media-tools/allinone/data/config"
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+config_dir="$script_dir/data/config"
 
 die() {
   echo "ERROR: $1" >&2
