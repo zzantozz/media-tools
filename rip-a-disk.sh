@@ -7,7 +7,7 @@
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 base_output_dir="${BASE_OUTPUT_DIR:-/l/ripping}"
-makemkvcon_path="/c/Program Files (x86)/MakeMKV/makemkvcon"
+makemkvcon_path="/c/Program Files (x86)/MakeMKV/makemkvcon64"
 
 usage() {
   echo "Usage: $0 [-f] [-d <disc num>] [-b <base output dir>] [-m <makemkvcon path>]" >&2
@@ -21,7 +21,7 @@ usage() {
   echo "    Don't prompt for input. Use the disk name taken from makemkvcon output."
   echo ""
   echo "  -d"
-  echo "    Use the specified disk number instead of 1."
+  echo "    Use the specified device instead of \\Device\\CdRom0 - see makemkvcon f -l for devices."
   echo ""
   echo "  -b <base output dir>"
   echo "    Sets the base output directory, inside of which the ripping dirs are created."
@@ -42,7 +42,7 @@ while getopts "fb:d:m:" opt; do
       force=true
       ;;
     d)
-      disknum="$OPTARG"
+      device="$OPTARG"
       ;;
     b)
       base_output_dir="$OPTARG"
@@ -58,12 +58,13 @@ done
 
 [ -d "$base_output_dir" ] || die "base output dir must be a directory, was '$base_output_dir'"
 [ -f "$makemkvcon_path" ] || die "makemkvcon not found at '$makemkvcon_path'"
-[ -n "$disknum" ] || disknum=1
+[ -n "$device" ] || device='\Device\CdRom0'
 
 tmp_info="$(mktemp)"
 trap 'rm -f "$tmp_info"' EXIT
 
-[ -n "$SKIP_INFO" ] || "$makemkvcon_path" -r --minlength=0 info disc:$disknum >"$tmp_info"
+echo "Grabbing disk info to $tmp_info"
+[ -n "$SKIP_INFO" ] || "$makemkvcon_path" -r --minlength=0 --noscan info "dev:$device" >"$tmp_info"
 
 # From a cursory examination of some disk info, it seems the name of the disk is stored in CINFO with an index of 2, 30, and 32. If I look in all of
 # them, hopefully I'll always find a good value somewhere.
@@ -106,8 +107,23 @@ done
 output_dir="$base_output_dir/$disk_name"
 mkdir -p "$output_dir" || die "Failed to create output dir '$output_dir'"
 mv "$tmp_info" "$output_dir/_info"
-[ -n "$SKIP_INFO" ] || "$makemkvcon_path" -r --minlength=30 info disc:$disknum >"$output_dir/_info_30"
-[ -n "$ONLY_INFO" ] || "$makemkvcon_path" mkv --minlength=30 disc:$disknum all "$output_dir"
+[ -n "$SKIP_INFO" ] || "$makemkvcon_path" -r --minlength=30 --noscan info "dev:$device" >"$output_dir/_info_30"
+begin_rip=$(date +%s)
+[ -n "$ONLY_INFO" ] || time "$makemkvcon_path" --minlength=30 --noscan mkv "dev:$device" all "$output_dir"
+end_rip=$(date +%s)
+
+# Figure out rough completion rate. I use this in Git bash in windows, so bc isn't available, and we have to
+# account for plain int division with truncation by adding half the divisor to the dividend.
+size=$(du "$output_dir" | awk '{print $1}')
+size_kb=$(( size ))
+elapsed=$(( end_rip-begin_rip ))
+elapsed_min=$(( (elapsed+30)/60 ))
+elapsed_sec=$(( elapsed-(elapsed_min*60) ))
+rip_rate=$(( (size_kb+(elapsed/2))/elapsed ))
+printf "Took %d (%02d:%02d) to rip %d KB at %d KB/s\n" "$elapsed" "$elapsed_min" "$elapsed_sec" "$size_kb" "$rip_rate"
 
 # This seems like a good place to spit out title overlap. In the future, maybe automate more around this, like prompting to omit titles if they overlap.
 bash "$script_dir/check-title-overlap.sh" "$output_dir/_info_30"
+
+# Make a sound so I know it's done!
+echo -en "\007"
