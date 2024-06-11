@@ -157,8 +157,8 @@ while read -r line; do
     [ -n "$season_from_path" ] || die "Couldn't determine season"
     if [ $season_from_path != $last_season ]; then raw_episode=1; fi
     season=$season_from_path; episode=$raw_episode
-    episode_spec="$(printf "e%02s" "$episode")"; if [ $num_sodes = 2 ]; then episode_spec="$(printf "e%02s-e%02s" "$episode" "$((episode+1))")"; fi
-    output_name="$(printf "Season $season/$show_name s%02s%s.mkv" "$season" "$episode_spec")"
+    episode_spec="$(printf "e%02d" "$episode")"; if [ $num_sodes = 2 ]; then episode_spec="$(printf "e%02d-e%02d" "$episode" "$((episode+1))")"; fi
+    output_name="$(printf "Season $season/$show_name s%02d%s.mkv" "$season" "$episode_spec")"
     echo "$path - raw_s$season_from_path raw_e$raw_episode sodes=$num_sodes s$season e$episode - $output_name"
     rel_path="${path/\/l\/ripping\//}"; config_path="$media_tools_dir/allinone/data/config/$rel_path"; echo "  -> $config_path"
     main_file="$media_tools_dir/allinone/data/config/$(dirname "$rel_path")/main"
