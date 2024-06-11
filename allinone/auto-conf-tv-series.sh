@@ -25,8 +25,6 @@ show_name=""
 input_dir_matches=()
 nomatch_seasons=()
 title_ignores=("Something to ignore because it can't be empty")
-episode_size_min=750000
-episode_size_max=2000000
 season_regexes=("Season (.)" "SEASON (.)")
 season_regex_group=1
 season_strategy=from_path
@@ -82,6 +80,11 @@ done
 [ "${#input_dir_matches[@]}" -gt 0 ] || die "At least one input dir match is required. (use -i with 'find -path ...' matching)"
 [ -d "$input_dir" ] || die "Input dir doesn't exist: $input_dir (override with INPUTDIR env)"
 [[ "$season_regex_group" =~ ^[0-9]+$ ]] || die "Regex group must be numeric"
+if [ -n "$episode_size_min" ] || [ -n "$episode_size_max" ]; then
+  if [ -n "$duration_min" ] || [ -n "$duration_max" ]; then
+    die "Can only set size or duration min/max"
+  fi
+fi
 
 last_season=0
 declare -A nomatch_season_cache
@@ -90,11 +93,30 @@ file_count=1
 
 while read -r line; do
   unset season_from_path num_sodes season episode episode_spec output_name rel_path main_file
-  size="$(echo $line | cut -d " " -f 1)"; path="$(echo $line | cut -d " " -f 2-)"; if [ "$size" -lt $episode_size_min ]; then num_sodes=0; elif [ "$size" -lt $episode_size_max ]; then num_sodes=1; else num_sodes=2; fi
-  if [ -n "$duration_min" ] || [ -n "$duration_max"]; then
-    duration=$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=DURATION-eng -of default=noprint_wrappers=1:nokey=1 "$input_abs_path" | cut -d '.' -f 1)
-    echo "Duration is $duration; what now?"
-    exit 1
+  size="$(echo $line | cut -d " " -f 1)"; path="$(echo $line | cut -d " " -f 2-)"
+  if [ -n "$episode_size_min" ] || [ -n "$episode_size_max" ]; then
+    if [ "$size" -lt $episode_size_min ]; then num_sodes=0; elif [ "$size" -lt $episode_size_max ]; then num_sodes=1; else num_sodes=2; fi
+  fi
+  if [ -n "$duration_min" ] || [ -n "$duration_max" ]; then
+    duration=$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=DURATION-eng -of default=noprint_wrappers=1:nokey=1 "$path" | cut -d '.' -f 1)
+    secs="$(duration_to_secs "$duration")"
+    [ -n "$duration_min" ] && duration_min_secs="$(duration_to_secs "$duration_min")"
+    [ -n "$duration_max" ] && duration_max_secs="$(duration_to_secs "$duration_max")"
+    if [ -n "$duration_min" ] && [ -n "$duration_max" ]; then
+      if [ "$secs" -lt "$duration_min_secs" ]; then
+        num_sodes=0
+      elif [ "$secs" -lt "$duration_max_secs" ]; then
+        num_sodes=1
+      else
+        num_sodes=2
+      fi
+    elif [ -n "$duration_min" ] && [ "$secs" -lt "$duration_min_secs" ]; then
+      num_sodes=0
+    elif [ -n "$duration_max" ] && [ "$secs" -gt "$duration_max_secs" ]; then
+      num_sodes=2
+    else
+      num_sodes=1
+    fi
   fi
   if [ "$num_sodes" = 0 ]; then echo "skip $path"; 
   else
