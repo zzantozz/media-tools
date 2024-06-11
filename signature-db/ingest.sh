@@ -50,7 +50,8 @@ flush_batch() {
 }
 
 handle_end_title() {
-  batch="${batch} insert into info (disk_id, disk_name, file_name, seq, length) values ($disk_count, '$disk_name', '$title_file_name', $title_count, $title_duration);"
+  stmt="insert into info (disk_id, disk_name, file_name, seq, length, source) values ($disk_count, '$disk_name', '$title_file_name', $title_count, $title_duration, '$source');"
+  batch="$batch $stmt"
   title_count=$((title_count+1))
   # Not sure what the max arg length is, but I've overrun it before at ~128k
   if [ "${#batch}" -gt 65536 ]; then
@@ -59,7 +60,7 @@ handle_end_title() {
 }
 
 rm -f "$script_dir/signatures.sqlite"
-sqlite3 "$script_dir/signatures.sqlite" 'create table info(pk integer primary key autoincrement, disk_id int, disk_name string, file_name string, seq int, length int)'
+sqlite3 "$script_dir/signatures.sqlite" 'create table info(pk integer primary key autoincrement, disk_id int, disk_name string, file_name string, seq int, length int, source string)'
 
 batch_prefix="PRAGMA synchronous = OFF; PRAGMA journal_mode = MEMORY; PRAGMA busy_timeout=10000; BEGIN TRANSACTION;"
 batch_suffix="END TRANSACTION;"
@@ -75,16 +76,18 @@ disk_count=0
 #exit 0
 
 IFS=$'\n'
-for f in $(find /mnt/l/ripping -name _info); do
+for f in $(find /mnt/d/ripping /mnt/l/ripping /mnt/k/ripping -name _info); do
   echo " -- $f"
+  source="${f//\'/\'\'}"
   title_count=0
   # Filter the input file to speed things up - it works fine without filtering, but it's really slow
   . "$script_dir/../disk-info-parser.sh" -i <(cat "$f" | grep -E '^(CINFO:2,|TINFO:[^,]*,(9|16),)') || die "Failed in processing '$f'"
   disk_count=$((disk_count+1))
   #break
 done
-for f in $(find /home/ryan/thediscdb-data/ -name '*.txt' -not -name '*-summary.txt'); do
+for f in $(find /mnt/k/thediscdb-data/ -name '*.txt' -not -name '*-summary.txt'); do
   echo " -- $f"
+  source="${f//\'/\'\'}"
   title_count=0
   . "$script_dir/../disk-info-parser.sh" -i <(cat "$f" | grep -E '^(CINFO:2,|TINFO:[^,]*,(9|16),)') || die "Failed in processing '$f'"
   disk_count=$((disk_count+1))
