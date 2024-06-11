@@ -3,8 +3,10 @@
 # How do I centralize this kind of config instead of repeating it everywhere?
 # Source a central config file in each script?
 
-source config
-source utils
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+
+source "$script_dir/config"
+source "$script_dir/utils"
 
 [ -d "$input_dir" ] || die "Input dir doesn't exist: '$input_dir'"
 
