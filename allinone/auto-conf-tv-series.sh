@@ -89,7 +89,7 @@ fi
 last_season=0
 declare -A nomatch_season_cache
 nomatch_season_counter=0
-file_count=1
+total_episodes_seen=0
 
 while read -r line; do
   unset season_from_path num_sodes season episode episode_spec output_name rel_path main_file
@@ -118,6 +118,8 @@ while read -r line; do
       num_sodes=1
     fi
   fi
+  # In case no min/max of any kind is set...
+  [ -n "$num_sodes" ] || num_sodes=1
   if [ "$num_sodes" = 0 ]; then echo "skip $path"; 
   else
     if [ "$season_strategy" = from_path ]; then
@@ -140,24 +142,22 @@ while read -r line; do
         fi
       fi
     elif [ "$season_strategy" = count_episodes ]; then
-      i=0
-      cum_episodes=0
-      while [ "$i" -lt "${#season_episodes[@]}" ]; do
-        this_season_episodes="${season_episodes[$i]}"
-        cum_episodes=$((cum_episodes + this_season_episodes))
-        if [ "$file_count" -le "$cum_episodes" ]; then
-          season_from_path="$i"
-          break;
-        fi
-        i=$((i+1))
+      local_s=0
+      cum_season_episodes="${season_episodes[$local_s]}"
+      while [ "$cum_season_episodes" -lt "$((total_episodes_seen+1))" ]; do
+        local_s=$((local_s+1))
+        this_season_episodes="${season_episodes[$local_s]}"
+        cum_season_episodes=$((cum_season_episodes + this_season_episodes))
       done
+      season_from_path=$((local_s+1))
     else
       die "Unsupported season strategy: $season_strategy"
     fi
     [ -n "$season_from_path" ] || die "Couldn't determine season"
     if [ $season_from_path != $last_season ]; then raw_episode=1; fi
     season=$season_from_path; episode=$raw_episode
-    episode_spec="$(printf "e%02d" "$episode")"; if [ $num_sodes = 2 ]; then episode_spec="$(printf "e%02d-e%02d" "$episode" "$((episode+1))")"; fi
+    episode_spec="$(printf "e%02d" "$episode")"
+    if [ $num_sodes = 2 ]; then episode_spec="$(printf "e%02d-e%02d" "$episode" "$((episode+1))")"; fi
     output_name="$(printf "Season $season/$show_name s%02d%s.mkv" "$season" "$episode_spec")"
     echo "$path - raw_s$season_from_path raw_e$raw_episode sodes=$num_sodes s$season e$episode - $output_name"
     rel_path="${path/$input_dir/}"; config_path="$media_tools_dir/allinone/data/config/$rel_path"; echo "  -> $config_path"
@@ -167,7 +167,9 @@ while read -r line; do
       echo "MAIN_NAME='$show_name'" >"$main_file"
       echo -e "OUTPUTNAME='$output_name'\nKEEP_STREAMS=all" >"$config_path"
     fi
-    raw_episode=$((raw_episode+num_sodes)); last_season="$season_from_path"
+    raw_episode=$((raw_episode+num_sodes))
+    total_episodes_seen=$((total_episodes_seen+num_sodes))
+    last_season="$season_from_path"
   fi
 done <<<"$( (
   ignore_string=XXXXXXXXXXXXXXXXX
