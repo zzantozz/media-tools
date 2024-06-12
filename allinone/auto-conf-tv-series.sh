@@ -160,7 +160,7 @@ while read -r line; do
     episode_spec="$(printf "e%02d" "$episode")"; if [ $num_sodes = 2 ]; then episode_spec="$(printf "e%02d-e%02d" "$episode" "$((episode+1))")"; fi
     output_name="$(printf "Season $season/$show_name s%02d%s.mkv" "$season" "$episode_spec")"
     echo "$path - raw_s$season_from_path raw_e$raw_episode sodes=$num_sodes s$season e$episode - $output_name"
-    rel_path="${path/\/l\/ripping\//}"; config_path="$media_tools_dir/allinone/data/config/$rel_path"; echo "  -> $config_path"
+    rel_path="${path/$input_dir/}"; config_path="$media_tools_dir/allinone/data/config/$rel_path"; echo "  -> $config_path"
     main_file="$media_tools_dir/allinone/data/config/$(dirname "$rel_path")/main"
     if [ "$DRYRUN" = false ]; then
       mkdir -p "$(dirname "$config_path")"
