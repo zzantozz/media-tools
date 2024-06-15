@@ -1,2 +1,3 @@
 MAIN_NAME="The Flintstones"
 INTERLACED=interlaced
+FFMPEG_EXTRA_OPTIONS="-c:a:0 aac -b:a:0 192k -ac:a:0 1"
