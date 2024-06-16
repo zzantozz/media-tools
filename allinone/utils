@@ -36,3 +36,15 @@ function duration_to_secs {
   secs=$((hours*3600 + minutes*60 + seconds))
   printf '%d' "$secs"
 }
+
+##
+# Sanitizes a name so that it can be used in a file path.
+#
+sanitize() {
+  sanitized="$1"
+  sanitized="${sanitized/\'/}"
+  sanitized="${sanitized/’/}"
+  sanitized="${sanitized//:/ -}"
+  sanitized="$(echo "$sanitized" | tr -s ' ')"
+  echo "$sanitized"
+}

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # This is a first stab at getting disk config from thediscdb. It'll assume an exact disk match
-# has been found and just match up the titles. Any non-match will cause a failure. Later, I'll
+# has been found and just match up the titles. Any non-match will be ignored. Later, I'll
 # probably want a different script to handle non-exact matches. It should probably try multiple
 # things, like matching things up by duration, checking the mpls names, and maybe looking at
 # segment maps.
@@ -42,6 +42,6 @@ while IFS=$'\n' read -r line; do
     rip_file_name="$(echo "$match" | awk -F "::" '{print $5}')"
     echo "$line::$rip_file_name"
   else
-    die "Disk info didn't have a match for a title mapped in thediscdb: $line"
+    echo "WARNING: Disk info didn't have a match for a title mapped in thediscdb: $line" >&2
   fi 
 done <"$query_info"

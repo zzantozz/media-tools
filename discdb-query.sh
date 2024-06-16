@@ -69,4 +69,4 @@ EOF
 flat_query="$(echo "$query" | tr -d '\n')"
 #echo "flat query=$flat_query"
 
-curl https://thediscdb.com/graphql -H 'content-type: application/json' -d "{\"query\": \"$flat_query\"}"
+curl -s https://thediscdb.com/graphql -H 'content-type: application/json' -d "{\"query\": \"$flat_query\"}"

@@ -48,10 +48,11 @@ while read -r line; do
   title_type="$(echo "$line" | awk -F :: '{print $5}')"
   title_name="$(echo "$line" | awk -F :: '{print $6}')"
   ripped_file="$(echo "$line" | awk -F :: '{print $7}')"
+  sanitized_title="$(sanitize "$title_name")"
   case "$title_type" in
     MainMovie)
       prefix=""
-      main_name="$title_name"
+      main_name="$sanitized_title"
       ;;
     Extra)
       prefix="Featurettes/"
@@ -59,11 +60,14 @@ while read -r line; do
     DeletedScene)
       prefix="Deleted Scenes/"
       ;;
+    Trailer)
+      prefix="Trailers/"
+      ;;
     *)
       die "Don't know how to handle title type: $title_type"
       ;;
   esac
-  printf 'OUTPUTNAME="%s%s"\nKEEP_STREAMS=all\n' "$prefix" "$title_name.mkv" >"$output_dir/$ripped_file"
+  printf 'OUTPUTNAME="%s%s"\nKEEP_STREAMS=all\n' "$prefix" "$sanitized_title.mkv" >"$output_dir/$ripped_file"
 done <"$data_file"
 
 [ -n "$main_name" ] || die "No main title found, so can't create main config file; should be detected from input, but you can set one manually with -m"
