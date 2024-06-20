@@ -258,7 +258,7 @@ function encode_one {
     debug "Check if already done; done file: $DONEFILE"
     [ -f "$DONEFILE" ] && DONE=true
     [ ! -f "$output_abs_path" ] && DONE=false
-    [ "$ONE" != "true" ] && [ $DONE = true ] && {
+    [ $DONE = true ] && {
 	echo "Done: $input_rel_path -> $output_abs_path" >&2
 	return 0
     }
