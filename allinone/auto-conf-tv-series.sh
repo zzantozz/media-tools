@@ -93,7 +93,9 @@ total_episodes_seen=0
 
 while read -r line; do
   unset season_from_path num_sodes season episode episode_spec output_name rel_path main_file
-  size="$(echo $line | cut -d " " -f 1)"; path="$(echo $line | cut -d " " -f 2-)"
+  size="$(echo "$line" | cut -d " " -f 1)"
+  # Handle path carefully - could have multiple whitespaces, which cut and awk will remove
+  path="$(echo "$line" | sed -r 's/^\S+\s+//')"
   if [ -n "$episode_size_min" ] || [ -n "$episode_size_max" ]; then
     if [ "$size" -lt $episode_size_min ]; then num_sodes=0; elif [ "$size" -lt $episode_size_max ]; then num_sodes=1; else num_sodes=2; fi
   fi
