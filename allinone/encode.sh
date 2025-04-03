@@ -38,6 +38,7 @@ die() {
 	echo "ERROR: $1" >&2
 	exit 1
 }
+export -f die
 
 [ -d "$CACHEDIR" ] || die "CACHEDIR doesn't exist: $CACHEDIR"
 [ -d "$DATADIR" ] || die "DATADIR doesn't exist: $DATADIR"
@@ -400,7 +401,7 @@ EOF
               exit 1
               ;;
           esac
-        elif [[ "$line" =~ mjpeg\ \(Baseline\).*\(attached\ pic\) ]]; then
+        elif [[ "$line" =~ mjpeg\ .*\(attached\ pic\) ]]; then
           :
         else
           echo "Couldn't detect stream type" >&2
