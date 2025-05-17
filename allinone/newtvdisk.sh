@@ -3,7 +3,6 @@
 # Makes it easy to create configs for a new disk of a tv show.
 
 config_dir="/home/ryan/media-tools/allinone/data/config"
-base_ripping_dir="/mnt/l/ripping"
 
 die() {
   echo "ERROR: $1" >&2
@@ -14,7 +13,7 @@ usage() {
   cat <<EOF >&2
 Usage: $0 -i <input name> -n <show name> [-s <season number>] [-d <disk number>] [-c <config dir>]
 
-For each ripped files in <input name>, this script displays stream info about the title, and prompts you for
+For each ripped file in <input name>, this script displays stream info about the title, and prompts you for
 information about it. Based on the info you provide, it writes an appropriate config file into data/config.
 The config file will see that the title is written out to the tv-shows output directory with the appropriate
 season and episode.
@@ -102,8 +101,9 @@ fi
 echo "input dir: $input_dir"
 [ -z "$season" ] && [[ "$input_dir" =~ Season\ ([0-9\.]+) ]] && season="${BASH_REMATCH[1]}"
 [[ "$input_dir" =~ Dis[ck]\ ([0-9A-Z]+) ]] && disk="${BASH_REMATCH[1]}"
-rel_path="${input_dir//$base_ripping_dir\/}"
-base_input_name="${rel_path%%/*}"
+rel_path="${input_dir/*\/ripping\//}"
+base_input_name="$(basename "$rel_path")"
+[ -n "$base_input_name" ] || die "Failed to get base input name. What's up?"
 [ -n "$season" ] || die "Didn't get a season number, and couldn't parse one from the input path"
 [ -n "$disk" ] || die "Didn't get a disk number, and couldn't parse one from the input path"
 echo "Discovered from input: rel_path name='$rel_path' base_input_name='$base_input_name' season='$season' disk='$disk'"
