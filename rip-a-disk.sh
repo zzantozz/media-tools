@@ -36,7 +36,7 @@ die() {
   usage
 }
 
-while getopts "fb:d:m:" opt; do
+while getopts "fb:d:m:n:" opt; do
   case "$opt" in
     f)
       force=true
@@ -49,6 +49,9 @@ while getopts "fb:d:m:" opt; do
       ;;
     m)
       makemkvcon_path="$OPTARG"
+      ;;
+    n)
+      disk_name="$OPTARG"
       ;;
     *)
       usage
@@ -64,20 +67,28 @@ tmp_info="$(mktemp)"
 trap 'rm -f "$tmp_info"' EXIT
 
 echo "Grabbing disk info to $tmp_info"
+begin_info1=$(date +%s)
 [ -n "$SKIP_INFO" ] || "$makemkvcon_path" -r --minlength=0 --noscan info "dev:$device" >"$tmp_info"
+end_info1=$(date +%s)
 
-# From a cursory examination of some disk info, it seems the name of the disk is stored in CINFO with an index of 2, 30, and 32. If I look in all of
-# them, hopefully I'll always find a good value somewhere.
-for n in 2 30 32; do
-  cinfo="$(grep "CINFO:$n,0," "$tmp_info")"
-  if [[ "$cinfo" =~ ^CINFO:$n,0,\"(.+)\" ]]; then
-    disk_name="${BASH_REMATCH[1]}"
-    [ -n "$disk_name" ] && break
-  fi
-done
+# If no disk name provided, try to find one. This is the normal case, but some TV series (Psych!) don't have good disk labels.
+if [ -n "$disk_name" ]; then
+  got_info=true
+else
+  # From a cursory examination of some disk info, it seems the name of the disk is stored in CINFO with an index of 2, 30, and 32. If I look in all of
+  # them, hopefully I'll always find a good value somewhere.
+  for n in 2 30 32; do
+    cinfo="$(grep "CINFO:$n,0," "$tmp_info")"
+    if [[ "$cinfo" =~ ^CINFO:$n,0,\"(.+)\" ]]; then
+      disk_name="${BASH_REMATCH[1]}"
+      [ -n "$disk_name" ] && break
+    fi
+  done
+  got_info="${force:-false}"
+fi
 
-#[ -n "$disk_name" ] || die "Unable to find disk name in disk info"
 disk_name="${disk_name/\'/}"
+disk_name="${disk_name/\//-}"
 disk_name="${disk_name/’/}"
 disk_name="${disk_name//:/ -}"
 disk_name="$(echo "$disk_name" | tr -s ' ')"
@@ -85,7 +96,6 @@ echo
 echo "Disk name will be '$disk_name'"
 echo
 
-got_info="${force:-false}"
 tracks=all
 
 while [ "$got_info" = false ]; do
@@ -107,7 +117,9 @@ done
 output_dir="$base_output_dir/$disk_name"
 mkdir -p "$output_dir" || die "Failed to create output dir '$output_dir'"
 mv "$tmp_info" "$output_dir/_info"
+begin_info2=$(date +%s)
 [ -n "$SKIP_INFO" ] || "$makemkvcon_path" -r --minlength=30 --noscan info "dev:$device" >"$output_dir/_info_30"
+end_info2=$(date +%s)
 begin_rip=$(date +%s)
 [ -n "$ONLY_INFO" ] || time "$makemkvcon_path" --minlength=30 --noscan mkv "dev:$device" all "$output_dir"
 end_rip=$(date +%s)
@@ -116,11 +128,20 @@ end_rip=$(date +%s)
 # account for plain int division with truncation by adding half the divisor to the dividend.
 size=$(du "$output_dir" | awk '{print $1}')
 size_kb=$(( size ))
-elapsed=$(( end_rip-begin_rip ))
-elapsed_min=$(( (elapsed+30)/60 ))
-elapsed_sec=$(( elapsed-(elapsed_min*60) ))
-rip_rate=$(( (size_kb+(elapsed/2))/elapsed ))
-printf "Took %d (%02d:%02d) to rip %d KB at %d KB/s\n" "$elapsed" "$elapsed_min" "$elapsed_sec" "$size_kb" "$rip_rate"
+
+# Time just for the rip
+elapsed_rip=$(( end_rip-begin_rip ))
+elapsed_rip_min=$(( (elapsed_rip+30)/60 ))
+elapsed_rip_sec=$(( elapsed_rip-(elapsed_rip/60*60) ))
+rip_rate=$(( (size_kb+(elapsed_rip/2))/elapsed_rip ))
+printf "Took %d (%d:%02d) to rip %d KB at %d KB/s\n" "$elapsed_rip" "$elapsed_rip_min" "$elapsed_rip_sec" "$size_kb" "$rip_rate"
+
+# Time including the two info gathering runs
+elapsed_all=$(( elapsed_rip + end_info1 - begin_info1 + end_info2 - end_info2 ))
+elapsed_all_min=$(( (elapsed_all+30)/60 ))
+elapsed_all_sec=$(( elapsed_all-(elapsed_all/60*60) ))
+all_rate=$(( (size_kb+(elapsed_all/2))/elapsed_all ))
+printf "Took %d (%d:%02d) for everything at %d KB/s\n" "$elapsed_all" "$elapsed_all_min" "$elapsed_all_sec" "$all_rate"
 
 # This seems like a good place to spit out title overlap. In the future, maybe automate more around this, like prompting to omit titles if they overlap.
 bash "$script_dir/check-title-overlap.sh" "$output_dir/_info_30"
