@@ -124,11 +124,13 @@ function encode_one {
     exit 1
   }
   debug "Loading main config: $main_config"
+  # shellcheck disable=SC1090
   source "$main_config" || {
     echo "Failed to source $main_config" >&2
     exit 1
   }
   debug "Using config: $config_file"
+  # shellcheck disable=SC1090
   source "$config_file" || {
     echo "Failed to source $config_file" >&2
     exit 1
@@ -235,63 +237,6 @@ function encode_one {
     die "No MAIN_TYPE configured, and couldn't determine one."
   fi
 
-    # Okay, at this point, I think we've gathered all the information
-    # we need about the input video. Now on to figuring out what to do
-    # with it.
-
-  [ "$QUALITY" = "rough" ] && {
-    output_rel_path="$(echo "$output_rel_path" | sed "s#/#_#g")"
-    base_output_dir="$TOOLSDIR"
-  }
-
-  output_abs_path="$base_output_dir/$output_rel_path"
-  output_tmp_path="$base_output_dir/$(dirname "$output_rel_path")/$(basename "$output_rel_path").part"
-
-  if [ -n "$ONLY_MAP" ]; then
-    echo "IN: $input_abs_path OUT: $output_abs_path"
-    return 0
-  fi
-
-  trap 'rm -f "$output_tmp_path"' EXIT
-
-  DONEFILE="$DONEDIR/$output_rel_path"
-  DONE=false
-  debug "Check if already done; done file: $DONEFILE"
-  [ -f "$DONEFILE" ] && DONE=true
-  [ ! -f "$output_abs_path" ] && DONE=false
-  [ $DONE = true ] && {
-    echo "Done: $input_rel_path -> $output_abs_path" >&2
-    return 0
-  }
-  echo "Processing $input_rel_path into $output_abs_path" >&2
-
-  # New stuff: I think it could be helpful to track the title length
-  # and possibly the checksum of inputs so we can more easily identify
-  # them in the future. Think of the case where we rip a disk with
-  # makemkv with different "minimum title length" settings. The file
-  # names would change, but the lengths of the titles ought to stay
-  # the same. Hopefully the checksums will, too, but I'm not
-  # confident about that, especially across makemkv releases.
-
-  # Always display the movie length because I use that to gauge
-  # progress when watching the logs.
-  input_length=$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=DURATION-eng -of default=noprint_wrappers=1:nokey=1 "$input_abs_path" | cut -d '.' -f 1)
-  echo "Duration: $input_length"
-
-  details_file="$DATADIR/details/$input_rel_path"
-  if [ ! -f "$details_file" ]; then
-    debug "Gathering title details"
-    input_size=$(du -b "$input_abs_path" | awk '{print $1}')
-    debug "Size: $input_size"
-    debug "Duration: $input_length"
-    echo "Recording details to $details_file"
-    mkdir -p "$(dirname "$details_file")"
-    cat <<EOF > "$details_file"
-ORIGINAL_DURATION=$input_length
-ORIGINAL_SIZE=$input_size
-EOF
-  fi
-
   # Let some values be set in config. Otherwise, figure them out.
   [ -n "$INTERLACED" ] && CONFIG_INTERLACED="$INTERLACED"
   [ -n "$CROPPING" ] && CONFIG_CROPPING="$CROPPING"
@@ -343,19 +288,52 @@ EOF
   VQ=$("$TOOLSDIR/quality.sh" "$input_abs_path")
   debug "Quality: $VQ"
 
+  # Okay, at this point, I think we've gathered all the information
+  # we need about the input video. Now on to figuring out what to do
+  # with it.
+
+  # New stuff: I think it could be helpful to track the title length
+  # and possibly the checksum of inputs so we can more easily identify
+  # them in the future. Think of the case where we rip a disk with
+  # makemkv with different "minimum title length" settings. The file
+  # names would change, but the lengths of the titles ought to stay
+  # the same. Hopefully the checksums will, too, but I'm not
+  # confident about that, especially across makemkv releases.
+
+  # Always display the movie length because I use that to gauge
+  # progress when watching the logs.
+  input_length=$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=DURATION-eng -of default=noprint_wrappers=1:nokey=1 "$input_abs_path" | cut -d '.' -f 1)
+  echo "Duration: $input_length"
+
+  details_file="$DATADIR/details/$input_rel_path"
+  if [ ! -f "$details_file" ]; then
+    debug "Gathering title details"
+    input_size=$(du -b "$input_abs_path" | awk '{print $1}')
+    debug "Size: $input_size"
+    debug "Duration: $input_length"
+    echo "Recording details to $details_file"
+    mkdir -p "$(dirname "$details_file")"
+    cat <<EOF > "$details_file"
+ORIGINAL_DURATION=$input_length
+ORIGINAL_SIZE=$input_size
+EOF
+  fi
+
   if [ -f "$DATADIR/cuts/$input_rel_path" ]; then
+    # Note: cuts were added before splitting and are based on input path. I have to rethink how this works with splitting.
+    [ "$SPLIT" = true ] && die "Can't use cuts with splits until I rewrite this!"
     concat_cache_file="$CACHEDIR/concat/$input_rel_path"
     FILTERCMD=("$script_dir/filter.sh" "$input_abs_path" -c "$concat_cache_file")
     EXTRAS=()
     [ "$INTERLACED" = "interlaced" ] && EXTRAS+=("yadif")
     [ "$CROPPING" = none ] || EXTRAS+=("crop=$CROPPING")
     [ -n "$EXTRAS" ] && FILTERCMD+=(-v "$(IFS=,; printf "%s" "${EXTRAS[*]}")")
-      mkdir -p "$(dirname "$concat_cache_file")"
-      printable=""
-      for x in "${FILTERCMD[@]}"; do
-        printable+="'$x' "
-      done
-      debug "Calculate filter args with: $printable"
+    mkdir -p "$(dirname "$concat_cache_file")"
+    printable=""
+    for x in "${FILTERCMD[@]}"; do
+      printable+="'$x' "
+    done
+    debug "Calculate filter args with: $printable"
     COMPLEXFILTER=$("${FILTERCMD[@]}") || {
       echo "filter.sh failed to determine complex filter string" >&2
       exit 1
@@ -446,100 +424,185 @@ EOF
     exit 1
   fi
 
-  # Use locally installed ffmpeg, or a docker container?
-  CMD=(ffmpeg)
-  #CMD=(docker run --rm -v "$TOOLSDIR":"$TOOLSDIR" -v "$MOVIESDIR":"$MOVIESDIR" -w "$(pwd)" jrottenberg/ffmpeg -stats)
-
-  [ -n "$USE_GPU" ] && ! [ "$NEVER_GPU" ] && CMD+=(-hwaccel cuda -hwaccel_output_format cuda)
-  CMD+=(-hide_banner -y -i "$input_abs_path")
-
-  # If doing cuts, use the concat file to attach cut subtitles from the input file
-  if [ -n "$COMPLEXFILTER" ]; then
-    CMD+=(-safe 0 -f concat -i "$concat_cache_file")
-  fi
-
-  # This because several videos end up failing with the "Too many packets buffered for output stream XXX" error.
-  # I don't think this will cause any problems.
-  CMD+=(-max_muxing_queue_size 1024)
-
-  # Use one filter or the other, if set. Setting both will cause an error, but that's checked earlier, and even if it's not,
-  # ffmpeg will tell you what you did wrong.
-  [ -z "$COMPLEXFILTER" ] || CMD+=(-filter_complex "$COMPLEXFILTER")
-  CMD+=($MAPS -c copy)
-  if [ -n "$VFILTERSTRING" ]; then
-    if [ -n "$USE_GPU" ]; then
-      CMD+=("-filter:v:0" "hwdownload,format=nv12,$VFILTERSTRING,hwupload_cuda")
-    else
-      CMD+=("-filter:v:0" "$VFILTERSTRING")
-    fi
-  fi
-
-  # Do real video encoding, or speed encode for checking the output?
-  [ "$QUALITY" = "rough" ] && {
-    #CMD+=(-c:0 mpeg2video -threads:0 2)
-    CMD+=(-c:0 libx264 -preset ultrafast)
-  } || {
-    if [ -n "$USE_GPU" ] && [ -z "$NEVER_GPU" ]; then
-      CMD+=(-c:0 hevc_nvenc)
-    else
-      CMD+=(-c:0 libx265 -crf:0 "$VQ")
-    fi
-  }
-  [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ] && {
-    CMD+=(-c:1 ac3 -ac:1 6 -b:1 384k)
-  }
-
-  # If cutting is happening, encodings to apply will have been calculated previously. You can't do any stream copies when using a
-  # complex filtergraph, so every stream needs an encoding.
-  [ -n "$COMPLEXFILTER" ] && {
-    CMD=("${CMD[@]}" "${encodings[@]}")
-  }
-
-  CMD+=(-metadata:s:0 "encoded_by=My smart encoder script")
-  [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ] && {
-    CMD+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
-  }
-  CMD+=($FFMPEG_EXTRA_OPTIONS)
-  CMD+=(-f matroska "$output_tmp_path")
-  LOGFILE="$LOGDIR/$output_rel_path.log"
-  DONEFILE="$DONEDIR/$output_rel_path"
-
-  for arg in "${CMD[@]}"; do
-    echo -n "\"${arg//\"/\\\"}\" "
-  done
-  echo "&> \"$LOGFILE\""
-  echo ""
-  echo "View logs:"
-  echo "tail -f \"$LOGFILE\""
-  echo "tail -F currentlog"
-  echo ""
-  echo " - $(date)"
-  mkdir -p "$(dirname "$output_abs_path")"
-  mkdir -p "$(dirname "$LOGFILE")"
-  mkdir -p "$(dirname "$DONEFILE")"
-  if [ -n "$DRYRUN" ]; then
-    echo "  -- dry run requested, not running"
+  # Check if the input title needs to be split. If so, the output path is dynamic and has to be recalculated for each
+  # output. The output_rel_path will contain a numeric printf format specifier that will be replaced by the count of the
+  # output based on splits. Do that before using the output path for anything! I.e. the first output file will get
+  # number 1, the second number 2, etc.
+  if [ "$SPLIT" = true ]; then
+    [ -n "${SPLIT_CHAPTER_STARTS[*]}" ] ||
+      die "Config calls for splitting, but no SPLIT_CHAPTER_STARTS is set"
+    [ -n "$SPLIT_START_NUMBER" ] ||
+      die "Config calls for splitting, but no SPLIT_START_NUMBER is set"
+    chapter_times_raw=$("$TOOLSDIR/chapters.sh" -i "$input_abs_path")
+    IFS=' ' read -r -a chapter_times <<< "$chapter_times_raw"
+    split_times=()
+    for chapter in "${SPLIT_CHAPTER_STARTS[@]}"; do
+      split_times+=("${chapter_times[$chapter]}")
+    done
+    debug "Splitting video at chapters ${SPLIT_CHAPTER_STARTS[*]}"
+    debug "  which corresponds to timestamps ${split_times[*]}"
   else
-    ln -fs "$LOGFILE" currentlog
-    "${CMD[@]}" &> "$LOGFILE" && mv "$output_tmp_path" "$output_abs_path"
-    encode_result="$?"
+    split_times=(0)
   fi
-  echo " - $(date)"
 
-  if [ "$QUALITY" = "rough" ]; then
-    echo "Rough encode done, not marking file as done done."
-  elif [ -n "$DRYRUN" ]; then
-    echo "Dry run, not marking file as done done."
-  elif [ "$encode_result" -eq 0 ]; then
-    echo "Marking file as done done."
-    mkdir -p "$(dirname "$DONEFILE")"
-    touch "$DONEFILE"
-  else
+  which_split=0
+  next_split=1
+  split_start_time="${split_times[$which_split]:-0}"
+  split_end_time="${split_times[$next_split]}"
+  # Processing splits this way (building a separate command for each output) is going to be extremely slow because it
+  # reads the entire input for every output. I could build a command that would only process the input once and fork
+  # each split off to its own output, but I really have no idea how I'd make cuts work with that. If I figure that out,
+  # come back here and change this.
+  while [ -n "$split_start_time" ]; do
+    split_args=()
+    # If the starting chapter is zero, and therefore the start timestamp is 0 (something like 0:00:00.00000), then omit
+    # the -ss to naturally start from the beginning of the input.
+    if ! [[ "$split_start_time" =~ ^[0:.]*$ ]]; then
+      split_args+=(-ss "$split_start_time")
+    fi
+    # If there are more splits to do, then the next entry in the split_times array will have the time of the end of the next split.
+    # Otherwise, there won't be any more times, meaning this is the last split, so we should leave this arg out of the command.
+    # (Crossing my fingers that ffmpeg realizes this means "go through the end of the input".)
+    to_time="${split_times[$next_split]}"
+    if [ -n "$to_time" ]; then
+      split_args+=(-to "$to_time")
+    fi
+    # This might have a format specifier for splitting
+    raw_output_abs_path="$base_output_dir/$output_rel_path"
+    if [ -n "${split_args[*]}" ]; then
+      output_abs_path="$(printf "$raw_output_abs_path" "$which_split")"
+      formatted_output_rel_path="$(printf "$output_rel_path" "$which_split")"
+    else
+      output_abs_path="$raw_output_abs_path"
+      formatted_output_rel_path="$output_rel_path"
+    fi
+
+    [ "$QUALITY" = "rough" ] && {
+      output_rel_path="${output_rel_path//\//_}"
+      base_output_dir="$TOOLSDIR"
+    }
+
+    output_abs_path="$base_output_dir/$formatted_output_rel_path"
+    output_tmp_path="$base_output_dir/$(dirname "$formatted_output_rel_path")/$(basename "$formatted_output_rel_path").part"
+
+    if [ -n "$ONLY_MAP" ]; then
+      echo "IN: $input_abs_path OUT: $output_abs_path"
+      return 0
+    fi
+
+    trap 'rm -f "$output_tmp_path"' EXIT
+
+    DONEFILE="$DONEDIR/$formatted_output_rel_path"
+    DONE=false
+    debug "Check if already done; done file: $DONEFILE"
+    [ -f "$DONEFILE" ] && DONE=true
+    [ ! -f "$output_abs_path" ] && DONE=false
+    [ $DONE = true ] && {
+      echo "Done: $input_rel_path -> $output_abs_path" >&2
+      return 0
+    }
+    echo "Processing $input_rel_path into $output_abs_path" >&2
+
+    # Use locally installed ffmpeg, or a docker container?
+    CMD=(ffmpeg)
+    #CMD=(docker run --rm -v "$TOOLSDIR":"$TOOLSDIR" -v "$MOVIESDIR":"$MOVIESDIR" -w "$(pwd)" jrottenberg/ffmpeg -stats)
+
+    [ -n "$USE_GPU" ] && ! [ "$NEVER_GPU" ] && CMD+=(-hwaccel cuda -hwaccel_output_format cuda)
+    CMD+=(-hide_banner -y -i "$input_abs_path")
+
+    # If doing cuts, use the concat file to attach cut subtitles from the input file
+    if [ -n "$COMPLEXFILTER" ]; then
+      CMD+=(-safe 0 -f concat -i "$concat_cache_file")
+    fi
+
+    # This because several videos end up failing with the "Too many packets buffered for output stream XXX" error.
+    # I don't think this will cause any problems.
+    CMD+=(-max_muxing_queue_size 1024)
+
+    # Use one filter or the other, if set. Setting both will cause an error, but that's checked earlier, and even if it's not,
+    # ffmpeg will tell you what you did wrong.
+    [ -z "$COMPLEXFILTER" ] || CMD+=(-filter_complex "$COMPLEXFILTER")
+    CMD+=($MAPS -c copy)
+    if [ -n "$VFILTERSTRING" ]; then
+      if [ -n "$USE_GPU" ]; then
+        CMD+=("-filter:v:0" "hwdownload,format=nv12,$VFILTERSTRING,hwupload_cuda")
+      else
+        CMD+=("-filter:v:0" "$VFILTERSTRING")
+      fi
+    fi
+
+    # Do real video encoding, or speed encode for checking the output?
+    [ "$QUALITY" = "rough" ] && {
+      #CMD+=(-c:0 mpeg2video -threads:0 2)
+      CMD+=(-c:0 libx264 -preset ultrafast)
+    } || {
+      if [ -n "$USE_GPU" ] && [ -z "$NEVER_GPU" ]; then
+        CMD+=(-c:0 hevc_nvenc)
+      else
+        CMD+=(-c:0 libx265 -crf:0 "$VQ")
+      fi
+    }
+    [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ] && {
+      CMD+=(-c:1 ac3 -ac:1 6 -b:1 384k)
+    }
+
+    # If cutting is happening, encodings to apply will have been calculated previously. You can't do any stream copies when using a
+    # complex filtergraph, so every stream needs an encoding.
+    [ -n "$COMPLEXFILTER" ] && {
+      CMD=("${CMD[@]}" "${encodings[@]}")
+    }
+
+    CMD+=(-metadata:s:0 "encoded_by=My smart encoder script")
+    [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ] && {
+      CMD+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
+    }
+    CMD+=($FFMPEG_EXTRA_OPTIONS)
+    CMD+=("${split_args[@]}")
+    CMD+=(-f matroska "$output_tmp_path")
+    LOGFILE="$LOGDIR/$formatted_output_rel_path.log"
+    DONEFILE="$DONEDIR/$formatted_output_rel_path"
+
+    for arg in "${CMD[@]}"; do
+      echo -n "\"${arg//\"/\\\"}\" "
+    done
+    echo "&> \"$LOGFILE\""
     echo ""
-    echo "Encoding not done?"
-    exit 1
-  fi
-  echo ""
+    echo "View logs:"
+    echo "tail -f \"$LOGFILE\""
+    echo "tail -F currentlog"
+    echo ""
+    echo " - $(date)"
+    mkdir -p "$(dirname "$output_abs_path")"
+    mkdir -p "$(dirname "$LOGFILE")"
+    mkdir -p "$(dirname "$DONEFILE")"
+    if [ -n "$DRYRUN" ]; then
+      echo "  -- dry run requested, not running"
+    else
+      ln -fs "$LOGFILE" currentlog
+      "${CMD[@]}" &> "$LOGFILE" && mv "$output_tmp_path" "$output_abs_path"
+      encode_result="$?"
+    fi
+    echo " - $(date)"
+
+    if [ "$QUALITY" = "rough" ]; then
+      echo "Rough encode done, not marking file as done done."
+    elif [ -n "$DRYRUN" ]; then
+      echo "Dry run, not marking file as done done."
+    elif [ "$encode_result" -eq 0 ]; then
+      echo "Marking file as done done."
+      mkdir -p "$(dirname "$DONEFILE")"
+      touch "$DONEFILE"
+    else
+      echo ""
+      echo "Encoding not done?"
+      exit 1
+    fi
+    echo ""
+    which_split=$((which_split+1))
+    next_split=$((which_split+1))
+    split_start_time="${split_times[$which_split]}"
+    split_end_time="${split_times[$next_split]}"
+  done
 }
 export -f encode_one
 
