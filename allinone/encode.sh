@@ -445,164 +445,180 @@ EOF
     split_times=(0)
   fi
 
+  [ "$QUALITY" = "rough" ] && {
+    output_rel_path="${output_rel_path//\//_}"
+    base_output_dir="$TOOLSDIR"
+  }
+
   which_split=0
   next_split=1
+  # Guarantee we enter the loop
   split_start_time="${split_times[$which_split]:-0}"
-  split_end_time="${split_times[$next_split]}"
-  # Processing splits this way (building a separate command for each output) is going to be extremely slow because it
-  # reads the entire input for every output. I could build a command that would only process the input once and fork
-  # each split off to its own output, but I really have no idea how I'd make cuts work with that. If I figure that out,
-  # come back here and change this.
+  output_args=()
+  output_tmp_paths=()
+  output_abs_paths=()
+  done_files=()
+  # Main loop to build output specs. It's this complicated to support splitting one input into multiple outputs (looking
+  # at you, Chuck bluray!!).
   while [ -n "$split_start_time" ]; do
-    split_args=()
     # If the starting chapter is zero, and therefore the start timestamp is 0 (something like 0:00:00.00000), then omit
-    # the -ss to naturally start from the beginning of the input.
+    # the -ss to naturally start from the beginning of the input. This will also be the case if we're not splitting.
     if ! [[ "$split_start_time" =~ ^[0:.]*$ ]]; then
-      split_args+=(-ss "$split_start_time")
+      output_args+=(-ss "$split_start_time")
     fi
-    # If there are more splits to do, then the next entry in the split_times array will have the time of the end of the next split.
-    # Otherwise, there won't be any more times, meaning this is the last split, so we should leave this arg out of the command.
-    # (Crossing my fingers that ffmpeg realizes this means "go through the end of the input".)
+    # If there are more splits to do, then the next entry in the split_times array will have the time of the end of the
+    # next split.
     to_time="${split_times[$next_split]}"
     if [ -n "$to_time" ]; then
-      split_args+=(-to "$to_time")
+      output_args+=(-to "$to_time")
     fi
-    # This might have a format specifier for splitting
-    raw_output_abs_path="$base_output_dir/$output_rel_path"
-    if [ -n "${split_args[*]}" ]; then
-      output_abs_path="$(printf "$raw_output_abs_path" "$which_split")"
-      formatted_output_rel_path="$(printf "$output_rel_path" "$which_split")"
+    # If we've added anything to output_args, we're doing splits, so format the output name
+    if [ -n "${output_args[*]}" ]; then
+      output_video_num=$((SPLIT_START_NUMBER + which_split))
+      formatted_output_rel_path="$(printf "$output_rel_path" "$output_video_num")"
     else
-      output_abs_path="$raw_output_abs_path"
+      # In this case, we're not splitting - the start time was 0, and there was no "next"
       formatted_output_rel_path="$output_rel_path"
     fi
-
-    [ "$QUALITY" = "rough" ] && {
-      output_rel_path="${output_rel_path//\//_}"
-      base_output_dir="$TOOLSDIR"
-    }
 
     output_abs_path="$base_output_dir/$formatted_output_rel_path"
     output_tmp_path="$base_output_dir/$(dirname "$formatted_output_rel_path")/$(basename "$formatted_output_rel_path").part"
 
+    done_file="$DONEDIR/$formatted_output_rel_path"
+    already_done=false
+    debug "Check if already done; done file: $done_file"
+    [ -f "$done_file" ] && already_done=true
+    [ -f "$output_abs_path" ] || already_done=false
+    if [ $already_done = true ]; then
+      echo "Done: $input_rel_path -> $output_abs_path" >&2
+    else
+      echo "Processing $input_rel_path into $output_abs_path" >&2
+      # This because several videos end up failing with the "Too many packets buffered for output stream XXX" error.
+      # I don't think this will cause any problems.
+      output_args+=(-max_muxing_queue_size 1024)
+      # Use one filter or the other, if set. Setting both will cause an error, but that's checked earlier, and even if it's not,
+      # ffmpeg will tell you what you did wrong.
+      [ -z "$COMPLEXFILTER" ] || output_args+=(-filter_complex "$COMPLEXFILTER")
+      output_args+=($MAPS -c copy)
+      if [ -n "$VFILTERSTRING" ]; then
+        if [ -n "$USE_GPU" ]; then
+          output_args+=("-filter:v:0" "hwdownload,format=nv12,$VFILTERSTRING,hwupload_cuda")
+        else
+          output_args+=("-filter:v:0" "$VFILTERSTRING")
+        fi
+      fi
+
+      # Do real video encoding, or speed encode for checking the output?
+      if [ "$QUALITY" = "rough" ]; then
+        #output_args+=(-c:0 mpeg2video -threads:0 2)
+        output_args+=(-c:0 libx264 -preset ultrafast)
+      else
+        if [ -n "$USE_GPU" ] && [ -z "$NEVER_GPU" ]; then
+          output_args+=(-c:0 hevc_nvenc)
+        else
+          output_args+=(-c:0 libx265 -crf:0 "$VQ")
+        fi
+      fi
+      if [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ]; then
+        output_args+=(-c:1 ac3 -ac:1 6 -b:1 384k)
+      fi
+
+      output_args+=(-metadata:s:0 "encoded_by=My smart encoder script")
+      if [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ]; then
+        output_args+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
+      fi
+      output_args+=($FFMPEG_EXTRA_OPTIONS)
+
+      output_args+=(-f matroska "$output_tmp_path")
+      output_tmp_paths+=("$output_tmp_path")
+      output_abs_paths+=("$output_abs_path")
+      done_files+=("$done_file")
+    fi
+
     if [ -n "$ONLY_MAP" ]; then
       echo "IN: $input_abs_path OUT: $output_abs_path"
-      return 0
     fi
 
-    trap 'rm -f "$output_tmp_path"' EXIT
-
-    DONEFILE="$DONEDIR/$formatted_output_rel_path"
-    DONE=false
-    debug "Check if already done; done file: $DONEFILE"
-    [ -f "$DONEFILE" ] && DONE=true
-    [ ! -f "$output_abs_path" ] && DONE=false
-    [ $DONE = true ] && {
-      echo "Done: $input_rel_path -> $output_abs_path" >&2
-      return 0
-    }
-    echo "Processing $input_rel_path into $output_abs_path" >&2
-
-    # Use locally installed ffmpeg, or a docker container?
-    CMD=(ffmpeg)
-    #CMD=(docker run --rm -v "$TOOLSDIR":"$TOOLSDIR" -v "$MOVIESDIR":"$MOVIESDIR" -w "$(pwd)" jrottenberg/ffmpeg -stats)
-
-    [ -n "$USE_GPU" ] && ! [ "$NEVER_GPU" ] && CMD+=(-hwaccel cuda -hwaccel_output_format cuda)
-    CMD+=(-hide_banner -y -i "$input_abs_path")
-
-    # If doing cuts, use the concat file to attach cut subtitles from the input file
-    if [ -n "$COMPLEXFILTER" ]; then
-      CMD+=(-safe 0 -f concat -i "$concat_cache_file")
-    fi
-
-    # This because several videos end up failing with the "Too many packets buffered for output stream XXX" error.
-    # I don't think this will cause any problems.
-    CMD+=(-max_muxing_queue_size 1024)
-
-    # Use one filter or the other, if set. Setting both will cause an error, but that's checked earlier, and even if it's not,
-    # ffmpeg will tell you what you did wrong.
-    [ -z "$COMPLEXFILTER" ] || CMD+=(-filter_complex "$COMPLEXFILTER")
-    CMD+=($MAPS -c copy)
-    if [ -n "$VFILTERSTRING" ]; then
-      if [ -n "$USE_GPU" ]; then
-        CMD+=("-filter:v:0" "hwdownload,format=nv12,$VFILTERSTRING,hwupload_cuda")
-      else
-        CMD+=("-filter:v:0" "$VFILTERSTRING")
-      fi
-    fi
-
-    # Do real video encoding, or speed encode for checking the output?
-    [ "$QUALITY" = "rough" ] && {
-      #CMD+=(-c:0 mpeg2video -threads:0 2)
-      CMD+=(-c:0 libx264 -preset ultrafast)
-    } || {
-      if [ -n "$USE_GPU" ] && [ -z "$NEVER_GPU" ]; then
-        CMD+=(-c:0 hevc_nvenc)
-      else
-        CMD+=(-c:0 libx265 -crf:0 "$VQ")
-      fi
-    }
-    [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ] && {
-      CMD+=(-c:1 ac3 -ac:1 6 -b:1 384k)
-    }
-
-    # If cutting is happening, encodings to apply will have been calculated previously. You can't do any stream copies when using a
-    # complex filtergraph, so every stream needs an encoding.
-    [ -n "$COMPLEXFILTER" ] && {
-      CMD=("${CMD[@]}" "${encodings[@]}")
-    }
-
-    CMD+=(-metadata:s:0 "encoded_by=My smart encoder script")
-    [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ] && {
-      CMD+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
-    }
-    CMD+=($FFMPEG_EXTRA_OPTIONS)
-    CMD+=("${split_args[@]}")
-    CMD+=(-f matroska "$output_tmp_path")
-    LOGFILE="$LOGDIR/$formatted_output_rel_path.log"
-    DONEFILE="$DONEDIR/$formatted_output_rel_path"
-
-    for arg in "${CMD[@]}"; do
-      echo -n "\"${arg//\"/\\\"}\" "
-    done
-    echo "&> \"$LOGFILE\""
-    echo ""
-    echo "View logs:"
-    echo "tail -f \"$LOGFILE\""
-    echo "tail -F currentlog"
-    echo ""
-    echo " - $(date)"
-    mkdir -p "$(dirname "$output_abs_path")"
-    mkdir -p "$(dirname "$LOGFILE")"
-    mkdir -p "$(dirname "$DONEFILE")"
-    if [ -n "$DRYRUN" ]; then
-      echo "  -- dry run requested, not running"
-    else
-      ln -fs "$LOGFILE" currentlog
-      "${CMD[@]}" &> "$LOGFILE" && mv "$output_tmp_path" "$output_abs_path"
-      encode_result="$?"
-    fi
-    echo " - $(date)"
-
-    if [ "$QUALITY" = "rough" ]; then
-      echo "Rough encode done, not marking file as done done."
-    elif [ -n "$DRYRUN" ]; then
-      echo "Dry run, not marking file as done done."
-    elif [ "$encode_result" -eq 0 ]; then
-      echo "Marking file as done done."
-      mkdir -p "$(dirname "$DONEFILE")"
-      touch "$DONEFILE"
-    else
-      echo ""
-      echo "Encoding not done?"
-      exit 1
-    fi
-    echo ""
     which_split=$((which_split+1))
     next_split=$((which_split+1))
     split_start_time="${split_times[$which_split]}"
-    split_end_time="${split_times[$next_split]}"
   done
+
+  if [ -n "$ONLY_MAP" ]; then
+    return 0
+  fi
+
+  # Just to be safe, unset the temp vars that were used above so that we don't confuse them with anything later on.
+  unset output_abs_path output_tmp_path formatted_output_rel_path done_file already_done
+
+  trap 'rm -f "${output_tmp_paths[@]}"' EXIT
+
+  # Use locally installed ffmpeg, or a docker container?
+  CMD=(ffmpeg)
+  #CMD=(docker run --rm -v "$TOOLSDIR":"$TOOLSDIR" -v "$MOVIESDIR":"$MOVIESDIR" -w "$(pwd)" jrottenberg/ffmpeg -stats)
+
+  [ -n "$USE_GPU" ] && ! [ "$NEVER_GPU" ] && CMD+=(-hwaccel cuda -hwaccel_output_format cuda)
+  CMD+=(-hide_banner -y -i "$input_abs_path")
+
+  # If doing cuts, use the concat file to attach cut subtitles from the input file
+  if [ -n "$COMPLEXFILTER" ]; then
+    CMD+=(-safe 0 -f concat -i "$concat_cache_file")
+  fi
+
+  # If cutting is happening, encodings to apply will have been calculated previously. You can't do any stream copies when using a
+  # complex filtergraph, so every stream needs an encoding.
+  [ -n "$COMPLEXFILTER" ] && {
+    CMD=("${CMD[@]}" "${encodings[@]}")
+  }
+
+  CMD+=("${output_args[@]}")
+  LOGFILE="$LOGDIR/$input_rel_path.log"
+
+  for arg in "${CMD[@]}"; do
+    echo -n "\"${arg//\"/\\\"}\" "
+  done
+  echo "&> \"$LOGFILE\""
+  echo ""
+  echo "View logs:"
+  echo "tail -f \"$LOGFILE\""
+  echo "tail -F currentlog"
+  echo ""
+  echo " - $(date)"
+
+  for path in "${output_abs_paths[@]}"; do
+    mkdir -p "$(dirname "$path")"
+  done
+  mkdir -p "$(dirname "$LOGFILE")"
+  if [ -n "$DRYRUN" ]; then
+    echo "  -- dry run requested, not running"
+  else
+    ln -fs "$LOGFILE" currentlog
+    "${CMD[@]}" &> "$LOGFILE"
+    encode_result="$?"
+  fi
+  echo " - $(date)"
+
+  if [ "$QUALITY" = "rough" ]; then
+    echo "Rough encode done, not marking file as done done."
+  elif [ -n "$DRYRUN" ]; then
+    echo "Dry run, not marking file as done done."
+  elif [ "$encode_result" -eq 0 ]; then
+    echo "Marking file as done done."
+    for i in "${!output_abs_paths[@]}"; do
+      output_tmp_path="${output_tmp_paths[i]}"
+      output_abs_path="${output_abs_paths[i]}"
+      done_file="${done_files[i]}"
+      if [ -z "$output_tmp_path" ] || [ -z "$output_abs_path" ] || [ -z "$done_file" ]; then
+        die "Something went horribly wrong: tmp='$output_tmp_path' abs='$output_abs_path' done='$done_file'"
+      fi
+      mv "$output_tmp_path" "$output_abs_path" && mkdir -p "$(dirname "$done_file")" && touch "$done_file"
+    done
+  else
+    echo ""
+    echo "Encoding not done?"
+    exit 1
+  fi
+  echo ""
 }
 export -f encode_one
 
