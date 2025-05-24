@@ -67,6 +67,31 @@ export -f debug
 
 debug "Running from $script_dir"
 
+function cleanup {
+  if [ -n "${output_tmp_paths[*]}" ]; then
+    for i in "${!output_tmp_paths[@]}"; do
+      tmp_output="${output_tmp_paths[i]}"
+      if [ -f "$tmp_output" ]; then
+        echo "Checking if should clean up '$tmp_output'"
+        j=$((i+1))
+        next_tmp_output="${output_tmp_paths[j]}"
+        if [ -n "$next_tmp_output" ] && [ -s "$next_tmp_output" ]; then
+          # The current one must have finished because the next one was at least started
+          abs_output="${output_abs_paths[i]}"
+          done_file="${done_files[i]}"
+          echo "It's done! Keep it!"
+          mv "$tmp_output" "$abs_output" && touch "$done_file"
+        else
+          # There is no next output, or it's empty, so the current one can't be trusted
+          echo "Doesn't look done. Trash it!"
+          rm -f "$tmp_output"
+        fi
+      fi
+    done
+  fi
+}
+export -f cleanup
+
 function encode_one {
   [ -f "$1" ] || {
     echo "File doesn't exist: '$1'" 2>&1
@@ -227,9 +252,11 @@ function encode_one {
     base_output_dir="$MOVIESDIR"
   elif [ "$MAIN_TYPE" = tvshow ] || [ "$MAIN_TYPE" = tv_show ]; then
     # If it's a tv special, we might want to store it under a movie for organization
-    if [ "$SPECIAL_TYPE" = movie ] && [ -n "$OUTPUTNAME" ] && ! [[ "$OUTPUTNAME" =~ $MAIN_NAME ]]; then
+    if [ "$SPECIAL_TYPE" = movie ] && [ -n "$OUTPUTNAME" ] && ! [[ "$OUTPUTNAME" =~ ^Season ]]; then
       base_output_dir="$MOVIESDIR"
-      [ -f "$base_output_dir/$MAIN_NAME/$MAIN_NAME.mkv" ] || die "Need a bogus movie file to support tv specials as movies!"
+      required_file="$base_output_dir/$MAIN_NAME/$MAIN_NAME.mkv"
+      [ -f "$required_file" ] || \
+        die "Need a bogus movie file to support tv specials as movies! at: $required_file"
     else
       base_output_dir="$TVSHOWSDIR"
     fi
@@ -299,11 +326,6 @@ function encode_one {
   # names would change, but the lengths of the titles ought to stay
   # the same. Hopefully the checksums will, too, but I'm not
   # confident about that, especially across makemkv releases.
-
-  # Always display the movie length because I use that to gauge
-  # progress when watching the logs.
-  input_length=$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=DURATION-eng -of default=noprint_wrappers=1:nokey=1 "$input_abs_path" | cut -d '.' -f 1)
-  echo "Duration: $input_length"
 
   details_file="$DATADIR/details/$input_rel_path"
   if [ ! -f "$details_file" ]; then
@@ -459,7 +481,7 @@ EOF
   output_abs_paths=()
   done_files=()
   # Main loop to build output specs. It's this complicated to support splitting one input into multiple outputs (looking
-  # at you, Chuck bluray!!).
+  # at you, Chuck bluray Season 2!!).
   while [ -n "$split_start_time" ]; do
     # If the starting chapter is zero, and therefore the start timestamp is 0 (something like 0:00:00.00000), then omit
     # the -ss to naturally start from the beginning of the input. This will also be the case if we're not splitting.
@@ -548,10 +570,19 @@ EOF
     return 0
   fi
 
+  if [ -z "${output_abs_paths[@]}" ]; then
+    return 0
+  fi
+
   # Just to be safe, unset the temp vars that were used above so that we don't confuse them with anything later on.
   unset output_abs_path output_tmp_path formatted_output_rel_path done_file already_done
 
-  trap 'rm -f "${output_tmp_paths[@]}"' EXIT
+  trap cleanup EXIT
+
+  # Always display the movie length because I use that to gauge
+  # progress when watching the logs.
+  input_length=$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=DURATION-eng -of default=noprint_wrappers=1:nokey=1 "$input_abs_path" | cut -d '.' -f 1)
+  echo "Duration: $input_length"
 
   # Use locally installed ffmpeg, or a docker container?
   CMD=(ffmpeg)
