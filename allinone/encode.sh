@@ -70,19 +70,26 @@ debug "Running from $script_dir"
 function cleanup {
   if [ -n "${output_tmp_paths[*]}" ]; then
     for i in "${!output_tmp_paths[@]}"; do
+      status=clean_it
       tmp_output="${output_tmp_paths[i]}"
       if [ -f "$tmp_output" ]; then
-        echo "Checking if should clean up '$tmp_output'"
+        echo "Checking if should we should keep or clean up '$tmp_output'"
         j=$((i+1))
         next_tmp_output="${output_tmp_paths[j]}"
-        if [ -n "$next_tmp_output" ] && [ -s "$next_tmp_output" ]; then
-          # The current one must have finished because the next one was at least started
+        if [ -n "$next_tmp_output" ] && [ -f "$next_tmp_output" ]; then
+          size="$(cat "$next_tmp_output" | wc -c)"
+          # Check for non-trivial size. In practice, non-started files seem to end up about 5k?
+          if [ "$size" -gt 102400 ]; then
+            # The current one must have finished because the next one was at least started
+            status=keep_it
+          fi
+        fi
+        if [ "$status" = keep_it ]; then
           abs_output="${output_abs_paths[i]}"
           done_file="${done_files[i]}"
           echo "It's done! Keep it!"
           mv "$tmp_output" "$abs_output" && touch "$done_file"
         else
-          # There is no next output, or it's empty, so the current one can't be trusted
           echo "Doesn't look done. Trash it!"
           rm -f "$tmp_output"
         fi
@@ -555,6 +562,7 @@ EOF
       output_tmp_paths+=("$output_tmp_path")
       output_abs_paths+=("$output_abs_path")
       done_files+=("$done_file")
+      debug "Created outputs for: '$output_tmp_path'"
     fi
 
     if [ -n "$ONLY_MAP" ]; then
@@ -566,11 +574,13 @@ EOF
     split_start_time="${split_times[$which_split]}"
   done
 
+  debug "Splitting into $which_split outputs"
+
   if [ -n "$ONLY_MAP" ]; then
     return 0
   fi
 
-  if [ -z "${output_abs_paths[@]}" ]; then
+  if [ -z "${output_abs_paths[*]}" ]; then
     return 0
   fi
 
