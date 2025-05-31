@@ -99,8 +99,8 @@ fi
 # Expect tv show structure and parse some info from it. Season and disk is usually numeric. Exceptions: season can be like "3.5" (BSG).
 # Disks can be like "1A" and "1B" (House).
 echo "input dir: $input_dir"
-[ -z "$season" ] && [[ "$input_dir" =~ Season\ ([0-9\.]+) ]] && season="${BASH_REMATCH[1]}"
-[[ "$input_dir" =~ Dis[ck]\ ([0-9A-Z]+) ]] && disk="${BASH_REMATCH[1]}"
+[ -z "$season" ] && [[ "$input_dir" =~ S[Ee][Aa][Ss][Oo][Nn]\ ([0-9\.]+) ]] && season="${BASH_REMATCH[1]}"
+[[ "$input_dir" =~ D[Ii][Ss][CcKk]\ ([0-9A-Z]+) ]] && disk="${BASH_REMATCH[1]}"
 rel_path="${input_dir/*\/ripping\//}"
 base_input_name="$(basename "$rel_path")"
 [ -n "$base_input_name" ] || die "Failed to get base input name. What's up?"
