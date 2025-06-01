@@ -135,39 +135,9 @@ if [ -n "$OUTPUTNAME" ]; then
     fi
   fi
   if ! [ "$MATCH" = true ]; then
-    # There are other cases where an output doesn't match the main movie name, such as:
-    #
-    # - Some special features are in the movie db and so I lift them up to the top level to be matched as a movie
-    #   in plex. Marvel One-Shots are an example of this.
-    #
-    # - Some disks have multiple movies on them, and I configure the main file for one movie, but then map the other
-    #   one separately.
-    #
-    # For now, I'll just make explicit exceptions for all of those here. As there get to be more of them, I should
-    # find a better way to handle them and ensure they're correct.
-    [[ "$OUTPUTNAME" =~ ^Marvel\ One[-\ ]Shot ]] && MATCH=true
-    special_cases=(
-      "Pirates of the Caribbean - Tales of the Code - Wedlocked.mkv"
-      "Godzilla and Mothra - The Battle for Earth.mkv"
-      "Cricket on the Hearth.mkv"
-      "Frosty the Snowman.mkv"
-      "Frosty Returns.mkv"
-      "Tremors 2.mkv"
-      "Muppet Treasure Island.mkv"
-      "Mechagodzilla 2.mkv"
-      "Rebirth of Mothra 2.mkv"
-      "Godzilla vs Spacegodzilla.mkv"
-      "Godzilla Mothra and King Ghidorah.mkv"
-      "Godzilla Tokyo SOS.mkv"
-      "Amazing Grace 1 - The History and Theology of Calvinism.mkv"
-      "Amazing Grace 2 - The History and Theology of Calvinism.mkv"
-    )
-    for case in "${special_cases[@]}"; do
-      [ "$OUTPUTNAME" = "$case" ] && MATCH=true
-    done
-  fi
-  if ! [ "$MATCH" = true ]; then
     echo "OUTPUTNAME looks wrong: '$OUTPUTNAME'"
+    echo "If this is a movie, the OUTPUTNAME should match the MAIN_NAME."
+    echo "If it's a TV show, the OUTPUTNAME should put it in a Season directory, named appropriately."
     echo "If you meant it to be in a Plex special dir, those are:"
     echo -n "  "
     for p in "${PLEXDIRS[@]}"; do
