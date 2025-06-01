@@ -98,16 +98,13 @@ source "$input"
 [ -n "$MAIN_NAME" ] || die "Doesn't set a MAIN_NAME"
 
 # Check for a valid output name or tv season+episode
-is_tv_config=false
 if [ -z "$OUTPUTNAME" ]; then
   debug "No OUTPUTNAME, checking for TV config"
   if [ -n "$SEASON" ] && [ -n "$EPISODE" ]; then
     debug "Season and episode are set explicitly; all good"
-    is_tv_config=true
   else
     if [[ "$input" =~ [Ss][Ee][Aa][Ss][Oo][Nn]\ [[:digit:]] ]] && [ -n "$EPISODE" ]; then
       debug "Episode is set, and season is in the path; all good"
-      is_tv_config=true
     else
       die "No OUTPUTNAME given, and can't find a season and episode for a tv show"
     fi
@@ -120,36 +117,35 @@ if [ -n "$OUTPUTNAME" ]; then
     die "OUTPUTNAME is set but doesn't end with .mkv"
   fi
   MATCH=false
+  # See if it's going into a recognized Plex "specials" dir
   PLEXDIRS=("Behind The Scenes" "Deleted Scenes" "Featurettes" "Interviews" "Scenes" "Shorts" "Trailers" "Other")
   for p in "${PLEXDIRS[@]}"; do
     [[ "$OUTPUTNAME" =~ ^$p/ ]] && MATCH=true
   done
-  if ! [ "$MATCH" = true ]; then
-    # If the output isn't placed in one of the valid plex dirs, then it should be a main movie file or a tv episode
-    # in a "Season" dir.
-    # Movies will match the MAIN_NAME in the main config
-    [ "$OUTPUTNAME" = "$MAIN_NAME.mkv" ] && MATCH=true
-    # But, there are some variations allowed, which we can match on. Wrinkle: some titles have parens with the year,
-    # like "Dune (2021)", which will break regex matching, so replace the MAIN_NAME with a token we can safely match on.
-    safe_output_name="${OUTPUTNAME/$MAIN_NAME/safe_main_name}"
-    # First, different movie editions are also acceptable
-    [[ "$safe_output_name" =~ safe_main_name\ \{edition-.*\}\.mkv ]] && MATCH=true
-    # TV shows could be mapped explicitly to output paths
-    if echo "$safe_output_name" | grep -P "Season \\d+/safe_main_name s\\d+e\\d+.mkv" >/dev/null; then
-      MATCH=true
-    fi
-    # Oh, and some files are multiple episodes...
-    if echo "$safe_output_name" | grep -P "Season \\d+/safe_main_name s\\d+e\\d+-e\\d+.mkv" >/dev/null; then
-      MATCH=true
-    fi
-    # And then there's my special system for auto-organizing TV special features, since Plex is terrible at it
-    if echo "$safe_output_name" | grep -P "Season 0/safe_main_name s00e\\d{6} - .*.mkv" >/dev/null; then
-      MATCH=true
-    fi
-    # Then there's the crazy episode splitting for Chuck...
-    if [ "$SPLIT" = true ] && echo "$safe_output_name" | grep -P "Season \\d+/safe_main_name s\\d+e%0\.2d.mkv" >/dev/null; then
-      MATCH=true
-    fi
+  # If the output isn't placed in one of the valid plex dirs, then it should be a main movie file or a tv episode
+  # in a "Season" dir.
+  # Movies will match the MAIN_NAME in the main config
+  [ "$OUTPUTNAME" = "$MAIN_NAME.mkv" ] && MATCH=true
+  # But, there are some variations allowed, which we can match on. Wrinkle: some titles have parens with the year,
+  # like "Dune (2021)", which will break regex matching, so replace the MAIN_NAME with a token we can safely match on.
+  safe_output_name="${OUTPUTNAME/$MAIN_NAME/safe_main_name}"
+  # First, different movie editions are also acceptable
+  [[ "$safe_output_name" =~ safe_main_name\ \{edition-.*\}\.mkv ]] && MATCH=true
+  # TV shows could be mapped explicitly to output paths
+  if echo "$safe_output_name" | grep -P "Season \\d+/safe_main_name s\\d+e\\d+.mkv" >/dev/null; then
+    MATCH=true
+  fi
+  # Oh, and some files are multiple episodes...
+  if echo "$safe_output_name" | grep -P "Season \\d+/safe_main_name s\\d+e\\d+-e\\d+.mkv" >/dev/null; then
+    MATCH=true
+  fi
+  # And then there's my special system for auto-organizing TV special features, since Plex is terrible at it
+  if echo "$safe_output_name" | grep -P "Season 0/safe_main_name s00e\\d{6} - .*.mkv" >/dev/null; then
+    MATCH=true
+  fi
+  # Then there's the crazy episode splitting for Chuck...
+  if [ "$SPLIT" = true ] && echo "$safe_output_name" | grep -P "Season \\d+/safe_main_name s\\d+e%0\.2d.mkv" >/dev/null; then
+    MATCH=true
   fi
   if ! [ "$MATCH" = true ]; then
     echo "OUTPUTNAME looks wrong: '$OUTPUTNAME'"
