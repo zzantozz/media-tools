@@ -24,7 +24,7 @@ done
 
 [ -f "$input" ] || die "Input file not found, set it with -i: '$input'"
 
-VALIDS=(
+valid_keys=(
   KEEP_STREAMS
   CUT_STREAMS
   INTERLACED
@@ -44,18 +44,35 @@ VALIDS=(
   NEVER_GPU
 )
 
-while read -r line; do
-  key="${line%%=*}"
-  debug "Checking key: '$key'"
-  [[ "${VALIDS[*]}" =~ $key ]] || [[ "$key" =~ ^# ]] || {
+report_key_validity() {
+  key="$1"
+  key_is_valid="$2"
+  if [ "$key_is_valid" = false ]; then
     echo "Invalid key: $key"
     echo "Acceptable keys are:"
     echo -n "  "
-    for p in "${VALIDS[@]}"; do
+    for p in "${valid_keys[@]}"; do
       echo -n "\"$p\" "
     done
     exit 1
-  }
+  fi
+}
+
+while read -r line; do
+  # Ignore blank lines
+  [[ "$line" =~ ^[[:space:]]*$ ]] && continue
+  # Ignore comments
+  [[ "$line" =~ ^# ]] && continue
+  # Otherwise, it should be a K=V line, and the key should be in the whitelist
+  key="${line%%=*}"
+  debug "Checking key: '$key'"
+  key_is_valid=false
+  for entry in "${valid_keys[@]}"; do
+    if [ "$entry" = "$key" ]; then
+      key_is_valid=true
+    fi
+  done
+  report_key_validity "$key" "$key_is_valid"
 done < "$input"
 
 # Now load up the config and inspect the values. There's a "main" config that all other configs inherit from. Usually,
