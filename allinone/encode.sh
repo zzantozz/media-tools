@@ -73,7 +73,7 @@ function cleanup {
       status=clean_it
       tmp_output="${output_tmp_paths[i]}"
       if [ -f "$tmp_output" ]; then
-        echo "Checking if should we should keep or clean up '$tmp_output'"
+        echo "Checking if we should should keep or clean up '$tmp_output'"
         j=$((i+1))
         next_tmp_output="${output_tmp_paths[j]}"
         if [ -n "$next_tmp_output" ] && [ -f "$next_tmp_output" ]; then
@@ -185,29 +185,15 @@ function encode_one {
   #   or "Season 4/MASH s04e02.mkv"
   #
   # The first part is always the same, based on whether this is a
-  # movie or tv show. (How do we know that? I'm not sure yet.)
+  # movie or tv show.
   #
-  # The second part comes from the main config file in an entry
-  # called MAIN_NAME.
+  # The second part comes from the variable MAIN_NAME.
   #
-  # The third part comes from the file-specific config file. For a
-  # movie, it'll be in a field named OUTPUTNAME. For a tv show,
-  # there will be SEASON and EPISODE fields, and we can build the
-  # output path. We'll look for OUTPUTNAME first and fall back to
-  # SEASON/EPISODE. That gives us two options for interpreting the
-  # data.
-  #
-  # One option is to say that if the config has an OUTPUTNAME, then
-  # it's a movie, and if not, it's a tv show. The other option is
-  # that we let tv shows use OUTPUTNAME in case we might need to
-  # account for special cases in the future. If we go the latter
-  # route, we need a different way to distinguish movie from tv
-  # show, which will probably have to be a setting in the main
-  # config file. Is there any other way to tell the difference?
-  # Maybe if the final output path contains the string "/Season
-  # \d+/"? Actually, maybe just if SEASON is set. That could come
-  # either from the config or from parsing it out of the path, below.
-  # In either case, if the thing has a SEASON, it must be a show.
+  # The third part comes primarily from the variable OUTPUTNAME.
+  # from the file-specific config file. For tv shows there's an,
+  # alternate path where we can built the relative output path
+  # based on the variables SEASON and EPISODE. In addition,
+  # SEASON is optional if it can be inferred from the input path.
   [ -n "$MAIN_NAME" ] || {
     echo "Missing MAIN_NAME from configuration. It should be set in the main config" >&2
     echo "file for the title at: $main_config" >&2
@@ -217,8 +203,8 @@ function encode_one {
   # Wait, as a special case, tv show inputs will likely have the
   # season in the input path, so look for it there if it's not in
   # the config.
-  rex="[/ ](Season|SEASON) ([[:digit:].]+)[/ ]"
-  if [ -z "$SEASON" ] && [[ "$input_rel_path" =~ $rex ]]; then
+  season_regex="[/ ](Season|SEASON) ([[:digit:].]+)[/ ]"
+  if [ -z "$SEASON" ] && [[ "$input_rel_path" =~ $season_regex ]]; then
     SEASON="${BASH_REMATCH[2]}"
   fi
 
@@ -242,23 +228,27 @@ function encode_one {
 
   # Also check for season in the output path! If the disks aren't ripped into the typical "tv show" structure,
   # but have an OUTPUTNAME that puts the outputs in that structure, the output would have a season in it.
-  if [ -z "$SEASON" ] && [[ "$output_rel_path" =~ $rex ]]; then
+  if [ -z "$SEASON" ] && [[ "$output_rel_path" =~ $season_regex ]]; then
     SEASON="${BASH_REMATCH[1]}"
   fi
 
+  # Now figure out if we're encoding a movie or a tv episode. We an make a guess based on whether a "season" is
+  # involved.
   if [ -n "$SEASON" ]; then
     MAIN_TYPE_GUESS=tvshow
   else
     MAIN_TYPE_GUESS=movie
   fi
 
-  # MAIN_TYPE could be configured. Only guess if it's not.
+  # If the MAIN_TYPE isn't configured (usually isn't), then fall back to our guess.
   [ -z "$MAIN_TYPE" ] && MAIN_TYPE="$MAIN_TYPE_GUESS"
 
+  # Based on what we know about the type, decide whether to put it in the movies output dir or the tv output dir.
   if [ "$MAIN_TYPE" = movie ]; then
     base_output_dir="$MOVIESDIR"
   elif [ "$MAIN_TYPE" = tvshow ] || [ "$MAIN_TYPE" = tv_show ]; then
-    # If it's a tv special, we might want to store it under a movie for organization
+    # If it's a tv special, we might want to store it under a movie for organization. Plex is bad at handling tv
+    # specials.
     if [ "$SPECIAL_TYPE" = movie ] && [ -n "$OUTPUTNAME" ] && ! [[ "$OUTPUTNAME" =~ ^Season ]]; then
       base_output_dir="$MOVIESDIR"
       required_file="$base_output_dir/$MAIN_NAME/$MAIN_NAME.mkv"
@@ -278,7 +268,7 @@ function encode_one {
   if [ -z "$CONFIG_INTERLACED" ] || [ -z "$CONFIG_CROPPING" ]; then
     analysis_cache_file="$CACHEDIR/analyze/$input_rel_path"
     if [ -f "$analysis_cache_file" ]; then
-      echo "Using cached analysis: $analysis_cache_file"
+      debug "Using cached analysis: $analysis_cache_file"
       ANALYSIS="$(cat "$analysis_cache_file")"
     else
       echo "Analyzing..."
@@ -462,7 +452,8 @@ EOF
       die "Config calls for splitting, but no SPLIT_CHAPTER_STARTS is set"
     [ -n "$SPLIT_START_NUMBER" ] ||
       die "Config calls for splitting, but no SPLIT_START_NUMBER is set"
-    chapter_times_raw=$("$TOOLSDIR/chapters.sh" -i "$input_abs_path")
+    chapter_times_raw=$("$TOOLSDIR/chapters.sh" -i "$input_abs_path") ||
+      die "Failed to read chapter times from input"
     IFS=' ' read -r -a chapter_times <<< "$chapter_times_raw"
     split_times=()
     for chapter in "${SPLIT_CHAPTER_STARTS[@]}"; do
