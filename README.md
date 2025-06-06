@@ -57,11 +57,17 @@ Since there's so much old stuff scattered around, some of it intertwined, here's
    There can/should also be a file named `main` that sets global defaults for everything in the directory, like the
    name of the movie/tv show. Existing files should make it easy to see how to set things up generally.
 
-6. Run the [allineone encode script](allinone/encode.sh). It will start by complaining about several directories
+    - [newmoviedisk.sh](allinone/newmoviedisk.sh) and [newtvdisk.sh](allinone/newtvdisk.sh) are helper scripts for quickly
+      generating new configs.
+
+6. Use the [validate script](allinone/validate.sh) to validate your configs. It not only ensures you've configured
+   things correctly and without typos. It also makes sure your outputs match expected Plex naming standards.
+
+7. Run the [allinone encode script](allinone/encode.sh). It will start by complaining about several directories
    that you need to set. I won't explain all of them here. Once set up correctly, it will process all the input
    titles into output files based on the config data provided.
 
-7. Point Plex at the output files.
+8. Point Plex at the output files.
 
 ## Guidelines
 
