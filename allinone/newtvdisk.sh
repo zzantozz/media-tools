@@ -161,8 +161,8 @@ for f in "$input_dir"/*; do
     elif [ "$t" = "Special Feature" ]; then
       read -p "Name: " answer
       if [ -n "$TV_SPECIALS_AS_MOVIE" ]; then
-        echo "Write this!"
-        exit 1
+        out_name="$answer.mkv"
+        special_type="movie"
       else
         # Make up an "episode" number that'll be unique. Plex only goes by the episode number, not the name. If you make two specials with the same episode, it
         # considers them two versions of the same thing.
@@ -191,6 +191,7 @@ for f in "$input_dir"/*; do
       echo "Writing to $config_file"
       echo "OUTPUTNAME=\"$out_name\"" > "$config_file"
       echo "KEEP_STREAMS=$keep_streams" >> "$config_file"
+      [ -z "$special_type" ] || echo "SPECIAL_TYPE=$special_type" >> "$config_file"
       read -p "Any extras? [y/N] " answer
       if [ "$answer" = y ]; then
         echo "Enter extra lines to append to config, followed by ^D"
