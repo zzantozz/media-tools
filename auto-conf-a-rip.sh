@@ -51,5 +51,7 @@ if ! [ "$reply" = y ]; then
   exit 0
 fi
 
-./auto-conf-from-discdb.sh -d matched_data -o "$config_dir" || die "Failed to generate config files from combined data"
+auto_conf_args=(-d matched_data -o "$config_dir")
+[ -n "$main_name" ] && auto_conf_args+=(-m "$main_name")
+./auto-conf-from-discdb.sh "${auto_conf_args[@]}" || die "Failed to generate config files from combined data"
 echo "Wrote configs to $config_dir"
