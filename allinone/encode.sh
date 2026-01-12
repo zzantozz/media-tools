@@ -277,7 +277,7 @@ function encode_one {
       debug "Using cached analysis: $analysis_cache_file"
       ANALYSIS="$(cat "$analysis_cache_file")"
     else
-      echo "Analyzing..."
+      echo "Analyzing $input_rel_path"
       echo " - $(date)"
       ANALYSIS=$("$TOOLSDIR/analyze.sh" "$input_abs_path" -k "$input_rel_path")
       mkdir -p "$(dirname "$analysis_cache_file")" \
@@ -307,11 +307,15 @@ function encode_one {
   debug "Interlacing: $INTERLACED"
   [ "$INTERLACED" = progressive ] || [ "$INTERLACED" = interlaced ] || {
     echo "Invalid interlace value: '$INTERLACED'" >&2
+    echo " - rel path: $input_rel_path" >&2
+    echo " - config  : $config_file" >&2
     exit 1
   }
   debug "Cropping: $CROPPING"
   [ -z "$CROPPING" ] && {
     echo "No cropping determined. There should always be a value here." >&2
+    echo " - rel path: $input_rel_path" >&2
+    echo " - config  : $config_file" >&2
     exit 1
   }
 

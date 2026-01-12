@@ -1,18 +1,18 @@
 #!/bin/bash -e
 
+function debug {
+  [[ "$DEBUG" =~ "filter" ]] && echo -e "$1" 1>&2
+  return 0
+}
+
 # Stuff copied from encode.sh to stay in sync with it.
 # Would it be better to source it from a common location?
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 export script_dir
-echo "Running from $script_dir" >&2
+debug "Running from $script_dir" >&2
 
 DATADIR="${DATADIR:-"$script_dir/data"}"
 export DATADIR
-
-function debug {
-	[[ "$DEBUG" =~ "filter" ]] && echo -e "$1" 1>&2
-	return 0
-}
 
 [ "$#" -gt 0 ] && [ -f "$1" ] || {
 	debug "Pass the name of an episode to generate a filter string for ffmpeg's complex_filter."
