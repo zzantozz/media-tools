@@ -33,6 +33,12 @@ length of 30 seconds and this for title selection:
 -sel:all,+sel:(favlang|nolang),-sel:mvcvideo,=100:all,-10:favlang,+sel:attachment
 ```
 
+Just for reference, the default as of Jan 2026 is
+
+```
+-sel:all,+sel:(favlang|nolang),-sel:mvcvideo,=100:all,-10:favlang
+```
+
 note: Here's how to update the videos encoded fast with gpu encoder to get better quality:
 
 ```
