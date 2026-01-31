@@ -25,14 +25,16 @@ INPUTDIR=${INPUTDIR:-"/mnt/l/ripping"}
 export INPUTDIR
 # Root directory of movies library, where final transcoded movies go, possibly in a subdirectory to organize
 # related items the way Plex likes them.
-MOVIESDIR=${MOVIESDIR:-"/mnt/plex-media/encoded/movies"}
+MOVIESDIR=${MOVIESDIR:-"/mnt/plex-media-alt/encoded/movies"}
 export MOVIESDIR
 # Root directory of tv shows library, where final transcoded shows go.
-TVSHOWSDIR=${TVSHOWSDIR:-"/mnt/plex-media/encoded/tv-shows"}
+TVSHOWSDIR=${TVSHOWSDIR:-"/mnt/plex-media-alt/encoded/tv-shows"}
 export TVSHOWSDIR
 # Directory holding general ripping tools
 TOOLSDIR=${TOOLSDIR:-"$script_dir/.."}
 export TOOLSDIR
+
+alt_dirs=(/mnt/plex-media/encoded/movies /mnt/plex-media/encoded/tv-shows)
 
 die() {
   echo "ERROR: $1" >&2
@@ -437,6 +439,12 @@ EOF
     MAPS="-map 0:0 -map $TRANSCODE_AUDIO $MAPS"
   }
   debug "MAPS: $MAPS"
+
+  # Just for temp HEROES UPSCALE
+#  if [[ "$input_rel_path" =~ Heroes ]]; then
+#      VFILTERS+=("zscale=w=-1:h=1080:filter=spline36,nlmeans,unsharp")
+#  fi
+
   VFILTERSTRING="${VFILTERS[0]}"
   i=1
   while [ $i -lt "${#VFILTERS[@]}" ]; do
@@ -517,9 +525,32 @@ EOF
     done_file="$DONEDIR/$formatted_output_rel_path"
     already_done=false
     debug "Check if already done; done file: $done_file"
-    [ -f "$done_file" ] && already_done=true
-    [ -f "$output_abs_path" ] || already_done=false
-    if [ $already_done = true ]; then
+    if [ -f "$done_file" ]; then
+	debug "  done file exists"
+	already_done=true
+    fi
+    output_exists=false
+    [ -f "$output_abs_path" ] && output_exists=true
+    for dir in "${alt_dirs[@]}"; do
+	[ -f "$dir/$formatted_output_rel_path" ] && output_exists=true
+    done
+
+    if [ "$output_exists" = false ]; then
+	debug "  output doesn't exist"
+	already_done=false
+    fi
+    debug "  already done = $already_done"
+
+    # Just for HEROES UPSCALE
+#    if [[ "$input_rel_path" =~ (HeroesS[123]|HeroesS4D[12]|HeroesS4D3/E[123]) ]]; then
+#	already_done=true;
+#    elif [[ "$input_rel_path" =~ Heroes ]]; then
+#	FORCE=true
+#	VQ=20
+#	output_abs_path="${output_abs_path/.mkv/-upscaled.mkv}"
+#    fi
+
+    if [ "$already_done" = true ] && [ -z "$FORCE" ]; then
       echo "Done: $input_rel_path -> $output_abs_path" >&2
     else
       echo "Processing $input_rel_path into $output_abs_path" >&2
@@ -666,4 +697,6 @@ export -f encode_one
 
 [ $# -eq 1 ] && ONE=true
 [ "$ONE" = true ] && encode_one "$1"
+#[ -z "$ONE" ] && "$script_dir/ls-inputs.sh" -sz | xargs -0I {} bash -c '[[ "{}" =~ HeroesS4 ]] && encode_one "{}"'
+#[ -z "$ONE" ] && "$script_dir/ls-inputs.sh" -sz | xargs -P2 -0I {} bash -c 'echo "{}" | grep -i "columbo" >/dev/null && encode_one "{}"'
 [ -z "$ONE" ] && "$script_dir/ls-inputs.sh" -sz | xargs -0I {} bash -c 'encode_one "{}"'
