@@ -34,7 +34,19 @@ export TVSHOWSDIR
 TOOLSDIR=${TOOLSDIR:-"$script_dir/.."}
 export TOOLSDIR
 
-alt_dirs=(/mnt/plex-media/encoded/movies /mnt/plex-media/encoded/tv-shows)
+function debug {
+  [[ "$DEBUG" =~ "encode" ]] && echo -e "$1" 1>&2
+  return 0
+}
+export -f debug
+
+if [ -n "$ALT_OUTPUT_DIRS" ]; then
+    IFS=: alt_output_dirs=($ALT_OUTPUT_DIRS)
+    debug "Using additional dirs for determining finished status:"
+    for dir in "${alt_output_dirs[@]}"; do
+	debug " - $dir"
+    done
+fi
 
 die() {
   echo "ERROR: $1" >&2
@@ -60,12 +72,6 @@ export OUTSTRING
 
 # If DRYRUN is set, export it so the function sees it
 [ -n "$DRYRUN" ] && export DRYRUN
-
-function debug {
-  [[ "$DEBUG" =~ "encode" ]] && echo -e "$1" 1>&2
-  return 0
-}
-export -f debug
 
 debug "Running from $script_dir"
 
@@ -531,7 +537,7 @@ EOF
     fi
     output_exists=false
     [ -f "$output_abs_path" ] && output_exists=true
-    for dir in "${alt_dirs[@]}"; do
+    for dir in "${alt_output_dirs[@]}"; do
 	[ -f "$dir/$formatted_output_rel_path" ] && output_exists=true
     done
 
