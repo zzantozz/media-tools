@@ -1,1 +1,2 @@
 MAIN_NAME='Psych'
+FFMPEG_EXTRA_OPTIONS="-disposition:s:0 0"
