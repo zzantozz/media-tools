@@ -1,1 +1,2 @@
 MAIN_NAME='Heroes (2006)'
+FFMPEG_EXTRA_OPTIONS="-disposition:s:0 0"
