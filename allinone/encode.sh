@@ -702,13 +702,31 @@ EOF
 export -f encode_one
 
 handle_input_file() {
-    cmd="encode_one '$1'"
-    flock --conflict-exit-code 222 -n "$1" bash -c "$cmd"
-    if [ $? = 222 ]; then
-       echo "Someone already locked '$1'"
-    fi
+    filter_input "$1"
 }
 export -f handle_input_file
+
+filter_input() {
+    if [ -z "$FILTER_INPUT" ] || [[ "$1" =~ $FILTER_INPUT ]]; then
+        lock_input "$1"
+    else
+	echo "Filtered out '$1'"
+    fi
+}
+export -f filter_input
+
+lock_input() {
+    # Complicated subshell with flock that I worked out because it's hard to get the function called with correct
+    # arguments otherwise. Remember the file names can have special chars in them.
+    (
+	if flock -n 200; then
+            encode_one "$1"
+	else
+            echo "Someone already locked '$1'"
+	fi
+    ) 200<"$1"
+}
+export -f lock_input
 
 [ $# -eq 1 ] && ONE=true
 [ "$ONE" = true ] && handle_input_file "$1"
