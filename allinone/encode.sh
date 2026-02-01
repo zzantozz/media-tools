@@ -701,8 +701,15 @@ EOF
 }
 export -f encode_one
 
+handle_input_file() {
+    cmd="encode_one '$1'"
+    flock --conflict-exit-code 222 -n "$1" bash -c "$cmd"
+    if [ $? = 222 ]; then
+       echo "Someone already locked '$1'"
+    fi
+}
+export -f handle_input_file
+
 [ $# -eq 1 ] && ONE=true
-[ "$ONE" = true ] && encode_one "$1"
-#[ -z "$ONE" ] && "$script_dir/ls-inputs.sh" -sz | xargs -0I {} bash -c '[[ "{}" =~ HeroesS4 ]] && encode_one "{}"'
-#[ -z "$ONE" ] && "$script_dir/ls-inputs.sh" -sz | xargs -P2 -0I {} bash -c 'echo "{}" | grep -i "columbo" >/dev/null && encode_one "{}"'
-[ -z "$ONE" ] && "$script_dir/ls-inputs.sh" -sz | xargs -0I {} bash -c 'encode_one "{}"'
+[ "$ONE" = true ] && handle_input_file "$1"
+[ -z "$ONE" ] && "$script_dir/ls-inputs.sh" -sz | xargs -0I {} bash -c 'handle_input_file "{}"'
