@@ -10,6 +10,8 @@ CACHEDIR="${CACHEDIR:-"$script_dir/cache"}"
 export CACHEDIR
 DATADIR="${DATADIR:-"$script_dir/data"}"
 export DATADIR
+LOCKDIR="${LOCKDIR:-"$CACHEDIR/locks"}"
+export LOCKDIR
 
 # Contains named files representing files already encoded. Remove a file to make it get processed again.
 DONEDIR="$CACHEDIR/done"
@@ -56,6 +58,7 @@ export -f die
 
 [ -d "$CACHEDIR" ] || die "CACHEDIR doesn't exist: $CACHEDIR"
 [ -d "$DATADIR" ] || die "DATADIR doesn't exist: $DATADIR"
+[ -d "$LOCKDIR" ] || die "LOCKDIR doesn't exist: $LOCKDIR"
 [ -d "$CONFIGDIR" ] || die "CONFIGDIR doesn't exist: $CONFIGDIR"
 [ -d "$INPUTDIR" ] || die "INPUTDIR doesn't exist: $INPUTDIR"
 [ -d "$MOVIESDIR" ] || die "MOVIESDIR doesn't exist: $MOVIESDIR"
@@ -106,6 +109,14 @@ function cleanup {
   fi
 }
 export -f cleanup
+
+function delete_lock_file {
+  if [ -n "$lock_file" ]; then
+    echo "Clean up lock file: '$lock_file'"
+    rm -f "$lock_file"
+  fi
+}
+export -f delete_lock_file
 
 function encode_one {
   [ -f "$1" ] || {
@@ -716,15 +727,30 @@ filter_input() {
 export -f filter_input
 
 lock_input() {
+    hash="$(echo "$1" | sha1sum | cut -d ' ' -f 1)"
+    lock_file="$LOCKDIR/$hash"
+    if ( set -o noclobber; >"$lock_file" ) &>/dev/null; then
+	echo "Create lock '$lock_file' for '$1'"
+        trap delete_lock_file EXIT
+	# it's available
+	encode_one "$1"
+	rm -f "$lock_file"
+    else
+	# it's already locked
+	echo "Someone already locked '$1'"
+    fi
+
     # Complicated subshell with flock that I worked out because it's hard to get the function called with correct
-    # arguments otherwise. Remember the file names can have special chars in them.
-    (
-	if flock -n 200; then
-            encode_one "$1"
-	else
-            echo "Someone already locked '$1'"
-	fi
-    ) 200<"$1"
+    # arguments otherwise. Remember the file names can have special chars in them. Turns out this doesn't work
+    # on cifs on multiple machiens. BLEH! I swear I tested flock across cifs. Maybe it's something with the file
+    # descriptors. What do I do now?
+#    (
+#	if flock -n 200; then
+ #           encode_one "$1"
+#	else
+ #           echo "Someone already locked '$1'"
+#	fi
+ #   ) 200<"$1"
 }
 export -f lock_input
 
