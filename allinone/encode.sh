@@ -718,10 +718,10 @@ handle_input_file() {
 export -f handle_input_file
 
 filter_input() {
-    if [ -z "$FILTER_INPUT" ] || [[ "$1" =~ $FILTER_INPUT ]]; then
+    if [ -z "$FILTER_INPUT" ] || echo "$1" | grep -Ei "$FILTER_INPUT" &>/dev/null; then
         lock_input "$1"
     else
-	echo "Filtered out '$1'"
+	debug "Filtered out '$1'"
     fi
 }
 export -f filter_input
