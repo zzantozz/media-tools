@@ -28,6 +28,9 @@ usage() {
   echo ""
   echo "  -m <makemkvcon path>"
   echo "    Sets the path to makemkvcon."
+  echo ""
+  echo "  -n <disk name>"
+  echo "    Sets the disk name pre-emptively. This will override the automatic name detection."
   exit 1
 }
 
