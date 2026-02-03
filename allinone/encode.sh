@@ -713,9 +713,18 @@ EOF
 export -f encode_one
 
 handle_input_file() {
-    filter_input "$1"
+  check_for_stop "$1"
 }
 export -f handle_input_file
+
+check_for_stop() {
+  if [ -f stop ]; then
+    echo "Stop signalled, stopping"
+  else
+    filter_input "$1"
+  fi
+}
+export -f check_for_stop
 
 filter_input() {
     if [ -z "$FILTER_INPUT" ] || echo "$1" | grep -Ei "$FILTER_INPUT" &>/dev/null; then
