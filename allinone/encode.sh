@@ -119,7 +119,7 @@ function encode_one {
 
   # This here for now because I can't export it
   if [ -n "$ALT_OUTPUT_DIRS" ]; then
-    IFS=: alt_output_dirs=($ALT_OUTPUT_DIRS)
+    mapfile -d : alt_output_dirs <<<"$ALT_OUTPUT_DIRS"
     debug "Using additional dirs for determining finished status:"
     for dir in "${alt_output_dirs[@]}"; do
 	debug " - $dir"
@@ -486,7 +486,7 @@ EOF
     EXTRAS=()
     [ "$INTERLACED" = "interlaced" ] && EXTRAS+=("yadif")
     [ "$CROPPING" = none ] || EXTRAS+=("crop=$CROPPING")
-    [ -n "$EXTRAS" ] && FILTERCMD+=(-v "$(IFS=,; printf "%s" "${EXTRAS[*]}")")
+    [ "${#EXTRAS[@]}" -gt 0 ] && FILTERCMD+=(-v "$(IFS=,; printf "%s" "${EXTRAS[*]}")")
     mkdir -p "$(dirname "$concat_cache_file")"
     printable=""
     for x in "${FILTERCMD[@]}"; do
@@ -512,7 +512,7 @@ EOF
   if [ -n "$COMPLEXFILTER" ]; then
     debug "have complex filter; mapping this way"
     s_idx=0
-    ALLOUTS=($OUTSTRING)
+    mapfile -d ' ' ALLOUTS <<<"$OUTSTRING"
     while read -r line; do
       if [[ "$line" =~ Stream\ #(.:.+)\([^\)]*\):\ (Video|Audio|Subtitle): ]]; then
         stream="${BASH_REMATCH[1]}"
@@ -557,8 +557,7 @@ EOF
     if [ "$KEEP_STREAMS" = all ]; then
       KEEP_STREAMS=0
     fi
-    STREAMS="${KEEP_STREAMS[@]}"
-    for S in $STREAMS; do
+    for S in "${KEEP_STREAMS[@]}"; do
       MAPS="$MAPS -map $S"
     done
   fi
@@ -612,7 +611,8 @@ EOF
     # Use one filter or the other, if set. Setting both will cause an error, but that's checked earlier, and even if it's not,
     # ffmpeg will tell you what you did wrong.
     [ -z "$COMPLEXFILTER" ] || output_args+=(-filter_complex "$COMPLEXFILTER")
-    IFS=" " output_args+=($MAPS -c copy)
+    mapfile -d ' ' maps_array <<< "$MAPS"
+    output_args+=("${maps_array[@]}" -c copy)
     if [ -n "$VFILTERSTRING" ]; then
       if [ -n "$USE_GPU" ]; then
         output_args+=("-filter:v:0" "hwdownload,format=nv12,$VFILTERSTRING,hwupload_cuda")
@@ -640,7 +640,7 @@ EOF
     if [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ]; then
       output_args+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
     fi
-    output_args+=($FFMPEG_EXTRA_OPTIONS)
+    output_args+=("${FFMPEG_EXTRA_OPTIONS[@]}")
 
     output_args+=(-f matroska "$output_tmp_path")
     debug "Created outputs for: '$output_tmp_path'"
@@ -764,7 +764,7 @@ export -f filter_input
 
     # Complicated subshell with flock that I worked out because it's hard to get the function called with correct
     # arguments otherwise. Remember the file names can have special chars in them. Turns out this doesn't work
-    # on cifs on multiple machiens. BLEH! I swear I tested flock across cifs. Maybe it's something with the file
+    # on cifs on multiple machines. BLEH! I swear I tested flock across cifs. Maybe it's something with the file
     # descriptors. What do I do now?
 #    (
 #	if flock -n 200; then
