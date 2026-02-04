@@ -581,7 +581,7 @@ EOF
       # Use one filter or the other, if set. Setting both will cause an error, but that's checked earlier, and even if it's not,
       # ffmpeg will tell you what you did wrong.
       [ -z "$COMPLEXFILTER" ] || output_args+=(-filter_complex "$COMPLEXFILTER")
-      output_args+=($MAPS -c copy)
+      IFS=" " output_args+=($MAPS -c copy)
       if [ -n "$VFILTERSTRING" ]; then
         if [ -n "$USE_GPU" ]; then
           output_args+=("-filter:v:0" "hwdownload,format=nv12,$VFILTERSTRING,hwupload_cuda")
