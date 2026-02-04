@@ -722,7 +722,7 @@ handle_input_file() {
 export -f handle_input_file
 
 check_for_stop() {
-  if [ -f stop ]; then
+  if [ -f "$script_dir/stop" ]; then
     echo "Stop signalled, stopping"
   else
     filter_input "$1"
