@@ -509,34 +509,22 @@ EOF
     base_output_dir="$TOOLSDIR"
   }
 
-  which_split=0
-  next_split=1
-  # Guarantee we enter the loop
-  split_start_time="${split_times[$which_split]:-0}"
   output_args=()
   output_tmp_paths=()
   output_abs_paths=()
   done_files=()
-  # Main loop to build output specs. It's this complicated to support splitting one input into multiple outputs (looking
-  # at you, Chuck bluray Season 2!!).
-  while [ -n "$split_start_time" ]; do
-    # If the starting chapter is zero, and therefore the start timestamp is 0 (something like 0:00:00.00000), then omit
-    # the -ss to naturally start from the beginning of the input. This will also be the case if we're not splitting.
-    if ! [[ "$split_start_time" =~ ^[0:.]*$ ]]; then
-      output_args+=(-ss "$split_start_time")
-    fi
-    # If there are more splits to do, then the next entry in the split_times array will have the time of the end of the
-    # next split.
-    to_time="${split_times[$next_split]}"
-    if [ -n "$to_time" ]; then
-      output_args+=(-to "$to_time")
-    fi
-    # If we've added anything to output_args, we're doing splits, so format the output name
-    if [ -n "${output_args[*]}" ]; then
-      output_video_num=$((SPLIT_START_NUMBER + which_split))
+  # First loop to determine outputs. It's this complicated to support splitting one input into multiple outputs (looking
+  # at you, Chuck bluray Season 2!!). This only reads config data, figures out if we're splitting, and then determines
+  # which of the outputs, if any, are already done. It stores everything else in the above variables so that a later
+  # loop can build up the commands for creating the correct outputs.
+  #
+  # It's done in two parts this way so that input locking can happen after determining "done" and before we have to do
+  # anything that causes side effects, like analyze.
+  for i in "${!split_times[@]}"; do
+    if [ "$SPLIT" = true ]; then
+      output_video_num=$((SPLIT_START_NUMBER + i))
       formatted_output_rel_path="$(printf "$output_rel_path" "$output_video_num")"
     else
-      # In this case, we're not splitting - the start time was 0, and there was no "next"
       formatted_output_rel_path="$output_rel_path"
     fi
 
@@ -547,87 +535,44 @@ EOF
     already_done=false
     debug "Check if already done; done file: $done_file"
     if [ -f "$done_file" ]; then
-	debug "  done file exists"
-	already_done=true
+      debug "  done file exists"
+      already_done=true
     fi
     output_exists=false
     [ -f "$output_abs_path" ] && output_exists=true
     for dir in "${alt_output_dirs[@]}"; do
-	[ -f "$dir/$formatted_output_rel_path" ] && output_exists=true
+	    [ -f "$dir/$formatted_output_rel_path" ] && output_exists=true
     done
 
     if [ "$output_exists" = false ]; then
-	debug "  output doesn't exist"
-	already_done=false
+      debug "  output doesn't exist"
+      already_done=false
     fi
     debug "  already done = $already_done"
 
     # Just for HEROES UPSCALE
 #    if [[ "$input_rel_path" =~ (HeroesS[123]|HeroesS4D[12]|HeroesS4D3/E[123]) ]]; then
-#	already_done=true;
+#	    already_done=true;
 #    elif [[ "$input_rel_path" =~ Heroes ]]; then
-#	FORCE=true
-#	VQ=20
-#	output_abs_path="${output_abs_path/.mkv/-upscaled.mkv}"
+#      FORCE=true
+#      VQ=20
+#      output_abs_path="${output_abs_path/.mkv/-upscaled.mkv}"
 #    fi
 
     if [ "$already_done" = true ] && [ -z "$FORCE" ]; then
-      echo "Done: $input_rel_path -> $output_abs_path" >&2
+      die "Done: $input_rel_path -> $output_abs_path"
     else
-      echo "Processing $input_rel_path into $output_abs_path" >&2
-      # This because several videos end up failing with the "Too many packets buffered for output stream XXX" error.
-      # I don't think this will cause any problems.
-      output_args+=(-max_muxing_queue_size 1024)
-      # Use one filter or the other, if set. Setting both will cause an error, but that's checked earlier, and even if it's not,
-      # ffmpeg will tell you what you did wrong.
-      [ -z "$COMPLEXFILTER" ] || output_args+=(-filter_complex "$COMPLEXFILTER")
-      IFS=" " output_args+=($MAPS -c copy)
-      if [ -n "$VFILTERSTRING" ]; then
-        if [ -n "$USE_GPU" ]; then
-          output_args+=("-filter:v:0" "hwdownload,format=nv12,$VFILTERSTRING,hwupload_cuda")
-        else
-          output_args+=("-filter:v:0" "$VFILTERSTRING")
-        fi
-      fi
-
-      # Do real video encoding, or speed encode for checking the output?
-      if [ "$QUALITY" = "rough" ]; then
-        #output_args+=(-c:0 mpeg2video -threads:0 2)
-        output_args+=(-c:0 libx264 -preset ultrafast)
-      else
-        if [ -n "$USE_GPU" ] && [ -z "$NEVER_GPU" ]; then
-          output_args+=(-c:0 hevc_nvenc)
-        else
-          output_args+=(-c:0 libx265 -crf:0 "$VQ")
-        fi
-      fi
-      if [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ]; then
-        output_args+=(-c:1 ac3 -ac:1 6 -b:1 384k)
-      fi
-
-      output_args+=(-metadata:s:0 "encoded_by=My smart encoder script")
-      if [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ]; then
-        output_args+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
-      fi
-      output_args+=($FFMPEG_EXTRA_OPTIONS)
-
-      output_args+=(-f matroska "$output_tmp_path")
       output_tmp_paths+=("$output_tmp_path")
       output_abs_paths+=("$output_abs_path")
       done_files+=("$done_file")
-      debug "Created outputs for: '$output_tmp_path'"
     fi
 
     if [ -n "$ONLY_MAP" ]; then
       echo "IN: $input_abs_path OUT: $output_abs_path"
     fi
-
-    which_split=$((which_split+1))
-    next_split=$((which_split+1))
-    split_start_time="${split_times[$which_split]}"
   done
 
-  debug "Splitting into $which_split outputs"
+  debug "Splitting into ${#output_abs_paths[@]} outputs"
 
   if [ -n "$ONLY_MAP" ]; then
     return 0
@@ -636,6 +581,66 @@ EOF
   if [ -z "${output_abs_paths[*]}" ]; then
     return 0
   fi
+
+  # Input locking should go here, after shifting some logic around to put analyze and whatever else does file caching
+  # below this.
+
+  # Second loop to actually process the discovered outputs. This builds the output part of the ffmpeg command by putting
+  # together everything we've gathered so far, like the video filters, the one or more output files, any extra ffmpeg
+  # options, etc.
+  for i in "${!output_abs_paths[@]}"; do
+    output_tmp_path="${output_tmp_paths[i]}"
+    output_abs_path="${output_abs_paths[i]}"
+    done_file="${done_files[i]}"
+    echo "Processing $input_rel_path into $output_abs_path" >&2
+    # On the first output, naturally start from the beginning of the input. On subsequent outputs, start from the split
+    # time. Likewise, on the final split, naturally end at the end of the input.
+    if [ "$i" -gt 0 ]; then
+      output_args+=(-ss "${split_times[i]}")
+      next="${split_times[i+1]}"
+      if [ -n "$next" ]; then
+        output_args+=(-to "$to_time")
+      fi
+    fi
+    # This because several videos end up failing with the "Too many packets buffered for output stream XXX" error.
+    # I don't think this will cause any problems.
+    output_args+=(-max_muxing_queue_size 1024)
+    # Use one filter or the other, if set. Setting both will cause an error, but that's checked earlier, and even if it's not,
+    # ffmpeg will tell you what you did wrong.
+    [ -z "$COMPLEXFILTER" ] || output_args+=(-filter_complex "$COMPLEXFILTER")
+    IFS=" " output_args+=($MAPS -c copy)
+    if [ -n "$VFILTERSTRING" ]; then
+      if [ -n "$USE_GPU" ]; then
+        output_args+=("-filter:v:0" "hwdownload,format=nv12,$VFILTERSTRING,hwupload_cuda")
+      else
+        output_args+=("-filter:v:0" "$VFILTERSTRING")
+      fi
+    fi
+
+    # Do real video encoding, or speed encode for checking the output?
+    if [ "$QUALITY" = "rough" ]; then
+      #output_args+=(-c:0 mpeg2video -threads:0 2)
+      output_args+=(-c:0 libx264 -preset ultrafast)
+    else
+      if [ -n "$USE_GPU" ] && [ -z "$NEVER_GPU" ]; then
+        output_args+=(-c:0 hevc_nvenc)
+      else
+        output_args+=(-c:0 libx265 -crf:0 "$VQ")
+      fi
+    fi
+    if [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ]; then
+      output_args+=(-c:1 ac3 -ac:1 6 -b:1 384k)
+    fi
+
+    output_args+=(-metadata:s:0 "encoded_by=My smart encoder script")
+    if [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ]; then
+      output_args+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
+    fi
+    output_args+=($FFMPEG_EXTRA_OPTIONS)
+
+    output_args+=(-f matroska "$output_tmp_path")
+    debug "Created outputs for: '$output_tmp_path'"
+  done
 
   # Just to be safe, unset the temp vars that were used above so that we don't confuse them with anything later on.
   unset output_abs_path output_tmp_path formatted_output_rel_path done_file already_done
