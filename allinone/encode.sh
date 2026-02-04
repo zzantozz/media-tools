@@ -42,14 +42,6 @@ function debug {
 }
 export -f debug
 
-if [ -n "$ALT_OUTPUT_DIRS" ]; then
-    IFS=: alt_output_dirs=($ALT_OUTPUT_DIRS)
-    debug "Using additional dirs for determining finished status:"
-    for dir in "${alt_output_dirs[@]}"; do
-	debug " - $dir"
-    done
-fi
-
 die() {
   echo "ERROR: $1" >&2
   exit 1
@@ -124,6 +116,18 @@ function encode_one {
     exit 1
   }
   set -e
+
+  # This here for now because I can't export it
+  if [ -n "$ALT_OUTPUT_DIRS" ]; then
+    IFS=: alt_output_dirs=($ALT_OUTPUT_DIRS)
+    debug "Using additional dirs for determining finished status:"
+    for dir in "${alt_output_dirs[@]}"; do
+	debug " - $dir"
+    done
+  fi
+
+
+  
   # Absolute path to the input file
   input_abs_path="$(realpath "$1")"
 
