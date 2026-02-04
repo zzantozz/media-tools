@@ -390,6 +390,12 @@ function encode_one {
   fi
 
   # Input locking should go here.
+  hash="$(echo "$input_abs_path" | sha1sum | cut -d ' ' -f 1)"
+  lock_file="$LOCKDIR/$hash"
+  trap delete_lock_file EXIT
+  if ! ( set -o noclobber; true >"$lock_file" ) &>/dev/null; then
+    die "Someone already locked '$input_rel_path'"
+  fi
 
   # Let some values be set in config. Otherwise, figure them out.
   [ -n "$INTERLACED" ] && CONFIG_INTERLACED="$INTERLACED"
@@ -735,26 +741,26 @@ export -f check_for_stop
 
 filter_input() {
     if [ -z "$FILTER_INPUT" ] || echo "$1" | grep -Ei "$FILTER_INPUT" &>/dev/null; then
-        lock_input "$1"
+        encode_one "$1"
     else
 	debug "Filtered out '$1'"
     fi
 }
 export -f filter_input
 
-lock_input() {
-    hash="$(echo "$1" | sha1sum | cut -d ' ' -f 1)"
-    lock_file="$LOCKDIR/$hash"
-    if ( set -o noclobber; >"$lock_file" ) &>/dev/null; then
-	echo "Create lock '$lock_file' for '$1'"
-        trap delete_lock_file EXIT
-	# it's available
-	encode_one "$1"
-	rm -f "$lock_file"
-    else
-	# it's already locked
-	echo "Someone already locked '$1'"
-    fi
+#lock_input() {
+#    hash="$(echo "$1" | sha1sum | cut -d ' ' -f 1)"
+#    lock_file="$LOCKDIR/$hash"
+#    if ( set -o noclobber; true >"$lock_file" ) &>/dev/null; then
+#	echo "Create lock '$lock_file' for '$1'"
+#        trap delete_lock_file EXIT
+#	# it's available
+#	encode_one "$1"
+#	rm -f "$lock_file"
+#    else
+#	# it's already locked
+#	echo "Someone already locked '$1'"
+#    fi
 
     # Complicated subshell with flock that I worked out because it's hard to get the function called with correct
     # arguments otherwise. Remember the file names can have special chars in them. Turns out this doesn't work
@@ -767,8 +773,8 @@ lock_input() {
  #           echo "Someone already locked '$1'"
 #	fi
  #   ) 200<"$1"
-}
-export -f lock_input
+#}
+#export -f lock_input
 
 [ $# -eq 1 ] && ONE=true
 [ "$ONE" = true ] && handle_input_file "$1"
