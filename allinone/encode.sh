@@ -290,6 +290,107 @@ function encode_one {
     die "No MAIN_TYPE configured, and couldn't determine one."
   fi
 
+  # Check if the input title needs to be split. If so, the output path is dynamic and has to be recalculated for each
+  # output. The output_rel_path will contain a numeric printf format specifier that will be replaced by the count of the
+  # output based on splits. Do that before using the output path for anything! I.e. the first output file will get
+  # number 1, the second number 2, etc.
+  if [ "$SPLIT" = true ]; then
+    [ -n "${SPLIT_CHAPTER_STARTS[*]}" ] ||
+      die "Config calls for splitting, but no SPLIT_CHAPTER_STARTS is set"
+    [ -n "$SPLIT_START_NUMBER" ] ||
+      die "Config calls for splitting, but no SPLIT_START_NUMBER is set"
+    chapter_times_raw=$("$TOOLSDIR/chapters.sh" -i "$input_abs_path") ||
+      die "Failed to read chapter times from input"
+    IFS=' ' read -r -a chapter_times <<< "$chapter_times_raw"
+    split_times=()
+    for chapter in "${SPLIT_CHAPTER_STARTS[@]}"; do
+      split_times+=("${chapter_times[$chapter]}")
+    done
+    debug "Splitting video at chapters ${SPLIT_CHAPTER_STARTS[*]}"
+    debug "  which corresponds to timestamps ${split_times[*]}"
+  else
+    split_times=(0)
+  fi
+
+  [ "$QUALITY" = "rough" ] && {
+    output_rel_path="${output_rel_path//\//_}"
+    base_output_dir="$TOOLSDIR"
+  }
+
+  output_args=()
+  output_tmp_paths=()
+  output_abs_paths=()
+  done_files=()
+  # First loop to determine outputs. It's this complicated to support splitting one input into multiple outputs (looking
+  # at you, Chuck bluray Season 2!!). This only reads config data, figures out if we're splitting, and then determines
+  # which of the outputs, if any, are already done. It stores everything else in the above variables so that a later
+  # loop can build up the commands for creating the correct outputs.
+  #
+  # It's done in two parts this way so that input locking can happen after determining "done" and before we have to do
+  # anything that causes side effects, like analyze.
+  for i in "${!split_times[@]}"; do
+    if [ "$SPLIT" = true ]; then
+      output_video_num=$((SPLIT_START_NUMBER + i))
+      formatted_output_rel_path="$(printf "$output_rel_path" "$output_video_num")"
+    else
+      formatted_output_rel_path="$output_rel_path"
+    fi
+
+    output_abs_path="$base_output_dir/$formatted_output_rel_path"
+    output_tmp_path="$base_output_dir/$(dirname "$formatted_output_rel_path")/$(basename "$formatted_output_rel_path").part"
+
+    done_file="$DONEDIR/$formatted_output_rel_path"
+    already_done=false
+    debug "Check if already done; done file: $done_file"
+    if [ -f "$done_file" ]; then
+      debug "  done file exists"
+      already_done=true
+    fi
+    output_exists=false
+    for dir in "$output_abs_path" "${alt_output_dirs[@]}"; do
+	    [ -f "$dir/$formatted_output_rel_path" ] && output_exists=true
+    done
+
+    if [ "$output_exists" = false ]; then
+      debug "  output doesn't exist"
+      already_done=false
+    fi
+    debug "  already done = $already_done"
+
+    # Just for HEROES UPSCALE
+#    if [[ "$input_rel_path" =~ (HeroesS[123]|HeroesS4D[12]|HeroesS4D3/E[123]) ]]; then
+#	    already_done=true;
+#    elif [[ "$input_rel_path" =~ Heroes ]]; then
+#      FORCE=true
+#      VQ=20
+#      output_abs_path="${output_abs_path/.mkv/-upscaled.mkv}"
+#    fi
+
+    if [ "$already_done" = true ] && [ -z "$FORCE" ]; then
+      die "Done: $input_rel_path -> $output_abs_path"
+    else
+      output_tmp_paths+=("$output_tmp_path")
+      output_abs_paths+=("$output_abs_path")
+      done_files+=("$done_file")
+    fi
+
+    if [ -n "$ONLY_MAP" ]; then
+      echo "IN: $input_abs_path OUT: $output_abs_path"
+    fi
+  done
+
+  debug "Splitting into ${#output_abs_paths[@]} outputs"
+
+  if [ -n "$ONLY_MAP" ]; then
+    return 0
+  fi
+
+  if [ -z "${output_abs_paths[*]}" ]; then
+    return 0
+  fi
+
+  # Input locking should go here.
+
   # Let some values be set in config. Otherwise, figure them out.
   [ -n "$INTERLACED" ] && CONFIG_INTERLACED="$INTERLACED"
   [ -n "$CROPPING" ] && CONFIG_CROPPING="$CROPPING"
@@ -481,109 +582,6 @@ EOF
     echo "Complex filter string: $COMPLEXFILTER" >&2
     exit 1
   fi
-
-  # Check if the input title needs to be split. If so, the output path is dynamic and has to be recalculated for each
-  # output. The output_rel_path will contain a numeric printf format specifier that will be replaced by the count of the
-  # output based on splits. Do that before using the output path for anything! I.e. the first output file will get
-  # number 1, the second number 2, etc.
-  if [ "$SPLIT" = true ]; then
-    [ -n "${SPLIT_CHAPTER_STARTS[*]}" ] ||
-      die "Config calls for splitting, but no SPLIT_CHAPTER_STARTS is set"
-    [ -n "$SPLIT_START_NUMBER" ] ||
-      die "Config calls for splitting, but no SPLIT_START_NUMBER is set"
-    chapter_times_raw=$("$TOOLSDIR/chapters.sh" -i "$input_abs_path") ||
-      die "Failed to read chapter times from input"
-    IFS=' ' read -r -a chapter_times <<< "$chapter_times_raw"
-    split_times=()
-    for chapter in "${SPLIT_CHAPTER_STARTS[@]}"; do
-      split_times+=("${chapter_times[$chapter]}")
-    done
-    debug "Splitting video at chapters ${SPLIT_CHAPTER_STARTS[*]}"
-    debug "  which corresponds to timestamps ${split_times[*]}"
-  else
-    split_times=(0)
-  fi
-
-  [ "$QUALITY" = "rough" ] && {
-    output_rel_path="${output_rel_path//\//_}"
-    base_output_dir="$TOOLSDIR"
-  }
-
-  output_args=()
-  output_tmp_paths=()
-  output_abs_paths=()
-  done_files=()
-  # First loop to determine outputs. It's this complicated to support splitting one input into multiple outputs (looking
-  # at you, Chuck bluray Season 2!!). This only reads config data, figures out if we're splitting, and then determines
-  # which of the outputs, if any, are already done. It stores everything else in the above variables so that a later
-  # loop can build up the commands for creating the correct outputs.
-  #
-  # It's done in two parts this way so that input locking can happen after determining "done" and before we have to do
-  # anything that causes side effects, like analyze.
-  for i in "${!split_times[@]}"; do
-    if [ "$SPLIT" = true ]; then
-      output_video_num=$((SPLIT_START_NUMBER + i))
-      formatted_output_rel_path="$(printf "$output_rel_path" "$output_video_num")"
-    else
-      formatted_output_rel_path="$output_rel_path"
-    fi
-
-    output_abs_path="$base_output_dir/$formatted_output_rel_path"
-    output_tmp_path="$base_output_dir/$(dirname "$formatted_output_rel_path")/$(basename "$formatted_output_rel_path").part"
-
-    done_file="$DONEDIR/$formatted_output_rel_path"
-    already_done=false
-    debug "Check if already done; done file: $done_file"
-    if [ -f "$done_file" ]; then
-      debug "  done file exists"
-      already_done=true
-    fi
-    output_exists=false
-    [ -f "$output_abs_path" ] && output_exists=true
-    for dir in "${alt_output_dirs[@]}"; do
-	    [ -f "$dir/$formatted_output_rel_path" ] && output_exists=true
-    done
-
-    if [ "$output_exists" = false ]; then
-      debug "  output doesn't exist"
-      already_done=false
-    fi
-    debug "  already done = $already_done"
-
-    # Just for HEROES UPSCALE
-#    if [[ "$input_rel_path" =~ (HeroesS[123]|HeroesS4D[12]|HeroesS4D3/E[123]) ]]; then
-#	    already_done=true;
-#    elif [[ "$input_rel_path" =~ Heroes ]]; then
-#      FORCE=true
-#      VQ=20
-#      output_abs_path="${output_abs_path/.mkv/-upscaled.mkv}"
-#    fi
-
-    if [ "$already_done" = true ] && [ -z "$FORCE" ]; then
-      die "Done: $input_rel_path -> $output_abs_path"
-    else
-      output_tmp_paths+=("$output_tmp_path")
-      output_abs_paths+=("$output_abs_path")
-      done_files+=("$done_file")
-    fi
-
-    if [ -n "$ONLY_MAP" ]; then
-      echo "IN: $input_abs_path OUT: $output_abs_path"
-    fi
-  done
-
-  debug "Splitting into ${#output_abs_paths[@]} outputs"
-
-  if [ -n "$ONLY_MAP" ]; then
-    return 0
-  fi
-
-  if [ -z "${output_abs_paths[*]}" ]; then
-    return 0
-  fi
-
-  # Input locking should go here, after shifting some logic around to put analyze and whatever else does file caching
-  # below this.
 
   # Second loop to actually process the discovered outputs. This builds the output part of the ffmpeg command by putting
   # together everything we've gathered so far, like the video filters, the one or more output files, any extra ffmpeg
