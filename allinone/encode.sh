@@ -114,7 +114,7 @@ function encode_one {
 
   # This here for now because I can't export it
   if [ -n "$ALT_OUTPUT_DIRS" ]; then
-    mapfile -d : alt_output_dirs <<<"$ALT_OUTPUT_DIRS"
+    IFS=: read -ra alt_output_dirs <<<"$ALT_OUTPUT_DIRS"
     debug "Using additional dirs for determining finished status:"
     for dir in "${alt_output_dirs[@]}"; do
 	debug " - $dir"
@@ -509,7 +509,7 @@ EOF
   if [ -n "$COMPLEXFILTER" ]; then
     debug "have complex filter; mapping this way"
     s_idx=0
-    mapfile -d ' ' ALLOUTS <<<"$OUTSTRING"
+    read -ra ALLOUTS <<<"$OUTSTRING"
     while read -r line; do
       if [[ "$line" =~ Stream\ #(.:.+)\([^\)]*\):\ (Video|Audio|Subtitle): ]]; then
         stream="${BASH_REMATCH[1]}"
@@ -608,7 +608,7 @@ EOF
     # Use one filter or the other, if set. Setting both will cause an error, but that's checked earlier, and even if it's not,
     # ffmpeg will tell you what you did wrong.
     [ -z "$COMPLEXFILTER" ] || output_args+=(-filter_complex "$COMPLEXFILTER")
-    mapfile -d ' ' maps_array <<< "$MAPS"
+    read -ra maps_array <<<"$MAPS"
     output_args+=("${maps_array[@]}" -c copy)
     if [ -n "$VFILTERSTRING" ]; then
       if [ -n "$USE_GPU" ]; then
