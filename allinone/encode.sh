@@ -3,6 +3,13 @@
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 export script_dir
 
+source "$script_dir/config"
+# Directory to scan for raw mkv's ripped from disc
+export INPUTDIR
+
+source "$script_dir/utils"
+export -f die
+
 # Base directories that contain details of media processing. "cache" is for temporary things. These shouldn't be committed.
 # "data" is where information is stored about how to process specific files. This should be committed. I normally keep these
 # in the same directory as the script. "data" is committed there.
@@ -22,9 +29,6 @@ export LOGDIR
 # Contains config files with data for each movie file to be encoded.
 CONFIGDIR=${CONFIGDIR:-"$DATADIR/config"}
 export CONFIGDIR
-# Directory to scan for raw mkv's ripped from disc
-INPUTDIR=${INPUTDIR:-"/mnt/l/ripping"}
-export INPUTDIR
 # Root directory of movies library, where final transcoded movies go, possibly in a subdirectory to organize
 # related items the way Plex likes them.
 MOVIESDIR=${MOVIESDIR:-"/mnt/plex-media/plex-media-server/encoded/movies"}
@@ -42,11 +46,6 @@ function debug {
 }
 export -f debug
 
-die() {
-  echo "ERROR: $1" >&2
-  exit 1
-}
-export -f die
 
 [ -d "$CACHEDIR" ] || die "CACHEDIR doesn't exist: $CACHEDIR"
 [ -d "$DATADIR" ] || die "DATADIR doesn't exist: $DATADIR"
