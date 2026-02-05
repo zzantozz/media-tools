@@ -635,15 +635,18 @@ EOF
     if [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ]; then
       output_args+=(-c:1 ac3 -ac:1 6 -b:1 384k)
     fi
-
+    # If cutting is happening, encodings to apply will have been calculated previously. You can't do any stream copies
+    # when using a complex filtergraph, so every stream needs an encoding.
+    [ -n "$COMPLEXFILTER" ] && {
+      output_args+=("${encodings[@]}")
+    }
     output_args+=(-metadata:s:0 "encoded_by=My smart encoder script")
     if [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ]; then
       output_args+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
     fi
-    output_args+=("${FFMPEG_EXTRA_OPTIONS[@]}")
-
-    output_args+=(-f matroska "$output_tmp_path")
+    output_args+=("${FFMPEG_EXTRA_OPTIONS[@]}" -f matroska "$output_tmp_path")
     debug "Created outputs for: '$output_tmp_path'"
+    debug "  outputs: '${output_args[*]}'"
   done
 
   # Just to be safe, unset the temp vars that were used above so that we don't confuse them with anything later on.
@@ -667,12 +670,6 @@ EOF
   if [ -n "$COMPLEXFILTER" ]; then
     CMD+=(-safe 0 -f concat -i "$concat_cache_file")
   fi
-
-  # If cutting is happening, encodings to apply will have been calculated previously. You can't do any stream copies when using a
-  # complex filtergraph, so every stream needs an encoding.
-  [ -n "$COMPLEXFILTER" ] && {
-    CMD=("${CMD[@]}" "${encodings[@]}")
-  }
 
   CMD+=("${output_args[@]}")
   LOGFILE="$LOGDIR/$input_rel_path.log"
