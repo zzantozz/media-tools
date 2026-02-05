@@ -27,10 +27,10 @@ INPUTDIR=${INPUTDIR:-"/mnt/l/ripping"}
 export INPUTDIR
 # Root directory of movies library, where final transcoded movies go, possibly in a subdirectory to organize
 # related items the way Plex likes them.
-MOVIESDIR=${MOVIESDIR:-"/mnt/plex-media-alt/encoded/movies"}
+MOVIESDIR=${MOVIESDIR:-"/mnt/plex-media/plex-media-server/encoded/movies"}
 export MOVIESDIR
 # Root directory of tv shows library, where final transcoded shows go.
-TVSHOWSDIR=${TVSHOWSDIR:-"/mnt/plex-media-alt/encoded/tv-shows"}
+TVSHOWSDIR=${TVSHOWSDIR:-"/mnt/plex-media/plex-media-server/encoded/tv-shows"}
 export TVSHOWSDIR
 # Directory holding general ripping tools
 TOOLSDIR=${TOOLSDIR:-"$script_dir/.."}
