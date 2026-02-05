@@ -597,11 +597,16 @@ EOF
     done_file="${done_files[i]}"
     echo "Processing $input_rel_path into $output_abs_path" >&2
     # On the first output, naturally start from the beginning of the input. On subsequent outputs, start from the split
-    # time. Likewise, on the final split, naturally end at the end of the input.
+    # time.
     if [ "$i" -gt 0 ]; then
       output_args+=(-ss "${split_times[i]}")
       next="${split_times[i+1]}"
-      if [ -n "$next" ]; then
+    fi
+    # Likewise, include the "to" time on all but the last output, allowing encoding to naturally end at the end of the
+    # input.
+    if [ "$i" -lt "${#output_abs_paths[@]}" ]; then
+      to_time="${split_times[i+1]}"
+      if [ -n "$to_time" ]; then
         output_args+=(-to "$to_time")
       fi
     fi
