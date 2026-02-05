@@ -342,7 +342,8 @@ function encode_one {
       already_done=true
     fi
     output_exists=false
-    for dir in "$output_abs_path" "${alt_output_dirs[@]}"; do
+    [ -f "$output_abs_path" ] && output_exists=true
+    for dir in "${alt_output_dirs[@]}"; do
 	    [ -f "$dir/$formatted_output_rel_path" ] && output_exists=true
     done
 
