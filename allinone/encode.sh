@@ -363,7 +363,8 @@ function encode_one {
 #    fi
 
     if [ "$already_done" = true ] && [ -z "$FORCE" ]; then
-      die "Done: $input_rel_path -> $output_abs_path"
+      echo "Done: $input_rel_path -> $output_abs_path" >&2
+      return 0
     else
       output_tmp_paths+=("$output_tmp_path")
       output_abs_paths+=("$output_abs_path")
@@ -590,6 +591,7 @@ EOF
   # together everything we've gathered so far, like the video filters, the one or more output files, any extra ffmpeg
   # options, etc.
   for i in "${!output_abs_paths[@]}"; do
+    debug "Output $i"
     output_tmp_path="${output_tmp_paths[i]}"
     output_abs_path="${output_abs_paths[i]}"
     done_file="${done_files[i]}"
@@ -652,7 +654,7 @@ EOF
   # Always display the movie length because I use that to gauge
   # progress when watching the logs.
   input_length=$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=DURATION-eng -of default=noprint_wrappers=1:nokey=1 "$input_abs_path" | cut -d '.' -f 1)
-  echo "Duration: $input_length"
+  echo "  duration: $input_length"
 
   # Use locally installed ffmpeg, or a docker container?
   CMD=(ffmpeg)
@@ -675,16 +677,14 @@ EOF
   CMD+=("${output_args[@]}")
   LOGFILE="$LOGDIR/$input_rel_path.log"
 
+  echo -n "  "
   for arg in "${CMD[@]}"; do
     echo -n "\"${arg//\"/\\\"}\" "
   done
-  echo "&> \"$LOGFILE\""
   echo ""
-  echo "View logs:"
-  echo "tail -f \"$LOGFILE\""
-  echo "tail -F currentlog"
-  echo ""
-  echo " - $(date)"
+  echo "  View logs:"
+  echo "    tail -f \"$LOGFILE\""
+  echo "    tail -F currentlog"
 
   for path in "${output_abs_paths[@]}"; do
     mkdir -p "$(dirname "$path")"
@@ -693,12 +693,13 @@ EOF
   if [ -n "$DRYRUN" ]; then
     echo "  -- dry run requested, not running"
   else
+    echo "  start: $(date)"
     ln -fs "$LOGFILE" currentlog
     "${CMD[@]}" &> "$LOGFILE"
     encode_result="$?"
     rm -f "$lock_file"
+    echo "  end: $(date)"
   fi
-  echo " - $(date)"
 
   if [ "$QUALITY" = "rough" ]; then
     echo "Rough encode done, not marking file as done done."
