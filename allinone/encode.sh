@@ -70,6 +70,10 @@ export OUTSTRING
 debug "Running from $script_dir"
 
 function cleanup {
+  if [ -n "$lock_file" ] && [ "$locked_by_me" = true ]; then
+    echo "Clean up lock file: '$lock_file'"
+    rm -f "$lock_file"
+  fi
   if [ -n "${output_tmp_paths[*]}" ]; then
     for i in "${!output_tmp_paths[@]}"; do
       status=clean_it
@@ -100,14 +104,6 @@ function cleanup {
   fi
 }
 export -f cleanup
-
-function delete_lock_file {
-  if [ -n "$lock_file" ]; then
-    echo "Clean up lock file: '$lock_file'"
-    rm -f "$lock_file"
-  fi
-}
-export -f delete_lock_file
 
 function encode_one {
   [ -f "$1" ] || {
@@ -389,12 +385,14 @@ function encode_one {
   fi
 
   # Input locking should go here.
-  hash="$(echo "$input_abs_path" | sha1sum | cut -d ' ' -f 1)"
-  lock_file="$LOCKDIR/$hash"
-  trap delete_lock_file EXIT
+  lock_key="$(echo "$input_abs_path" | sed -r "s/[:/ '\"]+/_/g")"
+  lock_file="$LOCKDIR/$lock_key"
+  echo "Locking '$input_rel_path' as $lock_key" >&2
   if ! ( set -o noclobber; true >"$lock_file" ) &>/dev/null; then
-    die "Someone already locked '$input_rel_path'"
+    echo "Someone already locked '$input_rel_path'" >&2
+    return 0
   fi
+  locked_by_me=true
 
   # Let some values be set in config. Otherwise, figure them out.
   [ -n "$INTERLACED" ] && CONFIG_INTERLACED="$INTERLACED"
@@ -697,6 +695,7 @@ EOF
     ln -fs "$LOGFILE" currentlog
     "${CMD[@]}" &> "$LOGFILE"
     encode_result="$?"
+    rm -f "$lock_file"
   fi
   echo " - $(date)"
 
