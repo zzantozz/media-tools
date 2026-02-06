@@ -501,7 +501,7 @@ EOF
     concat_cache_file="$CACHEDIR/concat/$input_rel_path"
     FILTERCMD=("$script_dir/filter.sh" "$input_abs_path" -c "$concat_cache_file")
     EXTRAS=()
-    [ "$INTERLACED" = "interlaced" ] && EXTRAS+=("yadif")
+    [ "$INTERLACED" = "interlaced" ] && EXTRAS+=("estdif")
     [ "$CROPPING" = none ] || EXTRAS+=("crop=$CROPPING")
     [ "${#EXTRAS[@]}" -gt 0 ] && FILTERCMD+=(-v "$(IFS=,; printf "%s" "${EXTRAS[*]}")")
     mkdir -p "$(dirname "$concat_cache_file")"
@@ -517,7 +517,7 @@ EOF
     debug "complex_filter: $COMPLEXFILTER"
   else
     VFILTERS=()
-    [ "$INTERLACED" = interlaced ] && VFILTERS+=("yadif")
+    [ "$INTERLACED" = interlaced ] && VFILTERS+=("estdif")
     [ "$CROPPING" = none ] || VFILTERS+=("crop=$CROPPING")
   fi
   [ -n "$KEEP_STREAMS" ] || {
