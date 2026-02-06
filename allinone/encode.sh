@@ -719,8 +719,7 @@ EOF
     ln -fs "$LOGFILE" currentlog
     "${CMD[@]}" &> "$LOGFILE"
     encode_result="$?"
-    rm -f "$lock_file"
-    echo "  end: $(date)"
+    echo "  end  : $(date)"
   fi
 
   if [ "$QUALITY" = "rough" ]; then
@@ -744,6 +743,9 @@ EOF
     exit 1
   fi
   echo ""
+  # Unlock after marking it done, or someone else may pick it up. Of course, there's still a slight chance of race
+  # condition here...
+  rm -f "$lock_file"
 }
 export -f encode_one
 
