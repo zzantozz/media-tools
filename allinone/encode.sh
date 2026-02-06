@@ -481,7 +481,7 @@ EOF
 
   # At present, I don't have a better place to set this as the default, so here.
   encoder=libx265
-  encoder_settings=()
+  encoder_settings=(-preset:v:0 slower)
   # I think this is a good place to adjust for first-pass mode. We've figured out most stuff and are about to use it.
   if [ "$MODE" = FIRST_PASS ]; then
     debug "Overriding setting for MODE=FIRST_PASS"
