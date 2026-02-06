@@ -750,34 +750,6 @@ filter_input() {
 }
 export -f filter_input
 
-#lock_input() {
-#    hash="$(echo "$1" | sha1sum | cut -d ' ' -f 1)"
-#    lock_file="$LOCKDIR/$hash"
-#    if ( set -o noclobber; true >"$lock_file" ) &>/dev/null; then
-#	echo "Create lock '$lock_file' for '$1'"
-#        trap delete_lock_file EXIT
-#	# it's available
-#	encode_one "$1"
-#	rm -f "$lock_file"
-#    else
-#	# it's already locked
-#	echo "Someone already locked '$1'"
-#    fi
-
-    # Complicated subshell with flock that I worked out because it's hard to get the function called with correct
-    # arguments otherwise. Remember the file names can have special chars in them. Turns out this doesn't work
-    # on cifs on multiple machines. BLEH! I swear I tested flock across cifs. Maybe it's something with the file
-    # descriptors. What do I do now?
-#    (
-#	if flock -n 200; then
- #           encode_one "$1"
-#	else
- #           echo "Someone already locked '$1'"
-#	fi
- #   ) 200<"$1"
-#}
-#export -f lock_input
-
 [ $# -eq 1 ] && ONE=true
 [ "$ONE" = true ] && handle_input_file "$1"
 [ -z "$ONE" ] && "$script_dir/ls-inputs.sh" -sz | xargs -0I {} bash -c 'handle_input_file "{}"'
