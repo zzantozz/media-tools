@@ -408,10 +408,10 @@ function encode_one {
     else
       echo "Analyzing $input_rel_path"
       echo " - $(date)"
-      ANALYSIS=$("$TOOLSDIR/analyze.sh" "$input_abs_path" -k "$input_rel_path")
-      mkdir -p "$(dirname "$analysis_cache_file")" \
-        && echo "$ANALYSIS" > "$analysis_cache_file" \
-        || die "Failed to write analysis to cache: $analysis_cache_file"
+      ANALYSIS=$("$TOOLSDIR/analyze.sh" "$input_abs_path" -k "$input_rel_path") || \
+        die "Analysis failed on '$input_abs_path'"
+      ( mkdir -p "$(dirname "$analysis_cache_file")" && echo "$ANALYSIS" > "$analysis_cache_file" ) || \
+        die "Failed to write analysis to cache: $analysis_cache_file"
       echo " - $(date)"
     fi
     eval "$ANALYSIS"
