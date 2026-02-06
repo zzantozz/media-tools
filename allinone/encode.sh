@@ -667,7 +667,9 @@ EOF
     if [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ]; then
       output_args+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
     fi
-    output_args+=("${FFMPEG_EXTRA_OPTIONS[@]}" -f matroska "$output_tmp_path")
+    # I probably should make this an array. I'd just have to convert a whole lot of configs.
+    read -ra extra_opts options_arr <<<"$FFMPEG_EXTRA_OPTIONS"
+    output_args+=("${extra_opts[@]}" -f matroska "$output_tmp_path")
     debug "Created outputs for: '$output_tmp_path'"
     debug "  outputs: '${output_args[*]}'"
   done
