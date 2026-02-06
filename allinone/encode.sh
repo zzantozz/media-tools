@@ -46,7 +46,6 @@ function debug {
 }
 export -f debug
 
-
 [ -d "$CACHEDIR" ] || die "CACHEDIR doesn't exist: $CACHEDIR"
 [ -d "$DATADIR" ] || die "DATADIR doesn't exist: $DATADIR"
 [ -d "$LOCKDIR" ] || die "LOCKDIR doesn't exist: $LOCKDIR"
@@ -55,6 +54,10 @@ export -f debug
 [ -d "$MOVIESDIR" ] || die "MOVIESDIR doesn't exist: $MOVIESDIR"
 [ -d "$TVSHOWSDIR" ] || die "TVSHOWSDIR doesn't exist: $TVSHOWSDIR"
 [ -d "$TOOLSDIR" ] || die "TOOLSDIR doesn't exist: $TOOLSDIR"
+
+if ! [ "$MODE" = FIRST_PASS ] && ! [ "$MODE" = FINAL ]; then
+  die "You have to set a MODE. There's no default yet. Choose: FIRST_PASS or FINAL."
+fi
 
 # Ensure cache subdirectories exist.
 mkdir -p "$DONEDIR"
@@ -121,8 +124,6 @@ function encode_one {
     done
   fi
 
-
-  
   # Absolute path to the input file
   input_abs_path="$(realpath "$1")"
 
@@ -334,7 +335,7 @@ function encode_one {
     output_abs_path="$base_output_dir/$formatted_output_rel_path"
     output_tmp_path="$base_output_dir/$(dirname "$formatted_output_rel_path")/$(basename "$formatted_output_rel_path").part"
 
-    done_file="$DONEDIR/$formatted_output_rel_path"
+    done_file="$DONEDIR/$MODE/$formatted_output_rel_path"
     already_done=false
     debug "Check if already done; done file: $done_file"
     if [ -f "$done_file" ]; then
@@ -386,7 +387,8 @@ function encode_one {
     return 0
   fi
 
-  # Input locking should go here.
+  # We've figured out all we can and know whether we need to actually encode the video now. If we've made it here, we're
+  # doing the encode, so lock the input so that other instances can't try to process the same file.
   lock_key="$(echo "$input_abs_path" | sed -r "s/[:/ '\"]+/_/g")"
   lock_file="$LOCKDIR/$lock_key"
   echo "Locking '$input_rel_path' as $lock_key" >&2
@@ -475,6 +477,22 @@ function encode_one {
 ORIGINAL_DURATION=$input_length
 ORIGINAL_SIZE=$input_size
 EOF
+  fi
+
+  # At present, I don't have a better place to set this as the default, so here.
+  encoder=libx265
+  encoder_settings=()
+  # I think this is a good place to adjust for first-pass mode. We've figured out most stuff and are about to use it.
+  if [ "$MODE" = FIRST_PASS ]; then
+    debug "Overriding setting for MODE=FIRST_PASS"
+    # Force no deinterlacing for speed
+    INTERLACED=progressive
+    # Keep cropping because in theory, encoding less pixels will be faster
+    # x264 is faster than x265
+    encoder=libx264
+    encoder_settings=(-preset:v:0 ultrafast)
+    # For first pass, we're going for small and fast. A higher CRF gives us small.
+    VQ=28
   fi
 
   if [ -f "$DATADIR/cuts/$input_rel_path" ]; then
@@ -634,7 +652,7 @@ EOF
       if [ -n "$USE_GPU" ] && [ -z "$NEVER_GPU" ]; then
         output_args+=(-c:0 hevc_nvenc)
       else
-        output_args+=(-c:0 libx265 -crf:0 "$VQ")
+        output_args+=(-c:0 "$encoder" "${encoder_settings[@]}" -crf:0 "$VQ")
       fi
     fi
     if [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ]; then
