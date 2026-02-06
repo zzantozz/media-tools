@@ -753,6 +753,7 @@ export -f handle_input_file
 check_for_stop() {
   if [ -f "$script_dir/stop" ]; then
     echo "Stop signalled, stopping"
+    return 1
   else
     filter_input "$1"
   fi
@@ -770,4 +771,4 @@ export -f filter_input
 
 [ $# -eq 1 ] && ONE=true
 [ "$ONE" = true ] && handle_input_file "$1"
-[ -z "$ONE" ] && "$script_dir/ls-inputs.sh" -sz | xargs -0I {} bash -c 'handle_input_file "{}"'
+[ -z "$ONE" ] && "$script_dir/ls-inputs.sh" -sz | xargs -0I {} bash -c 'handle_input_file "{}" || exit 255'
