@@ -479,6 +479,10 @@ ORIGINAL_SIZE=$input_size
 EOF
   fi
 
+  # Grab info about the input file streams because I'll (probably) need it in more than one place. I could probably
+  # speed things up by sharing this with utility scripts, too.
+  stream_data="$(ffprobe -probesize 100M -i "$input_abs_path" 2>&1 | grep Stream)"
+
   # At present, I don't have a better place to set this as the default, so here.
   encoder=libx265
   encoder_settings=(-preset:v:0 slower)
@@ -562,7 +566,7 @@ EOF
         exit 1
       fi
       s_idx=$((s_idx+1))
-    done <<<"$(ffprobe -probesize 100M -i "$input_abs_path" 2>&1 | grep Stream)"
+    done <<<"$stream_data"
 #    	NMAPS="${#CUT_STREAMS[@]}"
 #    	NMAPS=$((NMAPS-1))
 #    	for I in $(seq 0 $NMAPS); do
