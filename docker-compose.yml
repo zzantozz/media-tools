@@ -2,10 +2,17 @@
 # INPUTDIR. I need to figure out how to deal with multiple inputs in the script. Other than that, this
 # thing is pretty plug and play, once you get all the mounted directories in place.
 #
-# Even cooler, now that the encode script uses flock to ensure only one instance is processing an input
+# IMPORTANT NOTE: File cleanup currently doesn't work when you interrupt it. It'll leave .part files and lock
+# file laying around.
+#
+# Even cooler, now that the encode script uses has locking to ensure only one instance is processing an input
 # file, you can spin up multiple containers like
 # INPUTDIR=/mnt/k/ripping FILTER_INPUT="Psych Season" docker-compose up --scale ffmpeg=4
-version: '3.8'
+#
+# A full encoding command that cycles through multiple inputs, targets specific rips, and filters the output:
+# for drive in j k l; do docker compose down; \
+#   INPUTDIR=/mnt/$drive/ripping MODE=FIRST_PASS FILTER_INPUT="(babe|cheaper|blind)" \
+#     docker compose up --scale ffmpeg=1 2>&1 | grep -Ev '\| (Done|Missing)'; done
 
 services:
   ffmpeg:
@@ -24,6 +31,7 @@ services:
       - MOVIESDIR=/mnt/encode-target/movies
       - INPUTDIR=${INPUTDIR:-/mnt/j/ripping}
       - CACHEDIR=/mnt/d/ripping-work/cache
+      - MODE=${MODE:-}
 #      - ALT_OUTPUT_DIRS=/mnt/tmp1/plex-media-server/encoded/movies:/mnt/tmp1/plex-media-server/encoded/tv-shows:/mnt/tmp2/plex-media-server/encoded/movies:/mnt/tmp2/plex-media-server/encoded/tv-shows
       - FILTER_INPUT=${FILTER_INPUT:-}
     command: /media-tools/allinone/encode.sh
