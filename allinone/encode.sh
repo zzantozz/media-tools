@@ -128,7 +128,7 @@ function encode_one {
   input_abs_path="$(realpath "$1")"
 
   # Verify pixel format because I have to specify it for GPU encoding, and I'm not certain what happens if you change it.
-  in_pix_fmt="$(ffprobe -v error -select_streams v:0 -show_entries stream=pix_fmt -of default=noprint_wrappers=1:nokey=1 "$input_abs_path")"a
+  in_pix_fmt="$(ffprobe -v error -select_streams v:0 -show_entries stream=pix_fmt -of default=noprint_wrappers=1:nokey=1 "$input_abs_path")"
   if [ -n "$USE_GPU" ] && [ -z "$NEVER_GPU" ]; then
     [ "$in_pix_fmt" = "yuv420p" ] || {
       echo "Only handling pixel format yuv42p. Input has format '$in_pix_fmt'" >&2
