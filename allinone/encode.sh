@@ -524,7 +524,6 @@ EOF
        # Nearly half the width of 1080p (1920x1080), so let's upscale.
        debug "Upscaling DVD content"
        upscale_filters="$dvd_upscale_quick"
-       VQ=20
     fi
   else
     # Later, add support for POLISHED with the slow denoiser for DVD and possibly upscaling for bluray
@@ -538,7 +537,7 @@ EOF
     concat_cache_file="$CACHEDIR/concat/$input_rel_path"
     FILTERCMD=("$script_dir/filter.sh" "$input_abs_path" -c "$concat_cache_file")
     EXTRAS=()
-    [ "$INTERLACED" = "interlaced" ] && EXTRAS+=("estdif")
+    [ "$INTERLACED" = "interlaced" ] && EXTRAS+=("bwdif=mode=1")
     [ "$CROPPING" = none ] || EXTRAS+=("crop=$CROPPING")
     [ "${#EXTRAS[@]}" -gt 0 ] && FILTERCMD+=(-v "$(IFS=,; printf "%s" "${EXTRAS[*]}")")
     mkdir -p "$(dirname "$concat_cache_file")"
@@ -554,7 +553,7 @@ EOF
     debug "complex_filter: $COMPLEXFILTER"
   else
     VFILTERS=()
-    [ "$INTERLACED" = interlaced ] && VFILTERS+=("estdif")
+    [ "$INTERLACED" = interlaced ] && VFILTERS+=("bwdif=mode=1")
     [ "$CROPPING" = none ] || VFILTERS+=("crop=$CROPPING")
     # Upscale *after* deinterlacing, per Claude!
     [ -z "$upscale_filters" ] || VFILTERS+=("$upscale_filters")
