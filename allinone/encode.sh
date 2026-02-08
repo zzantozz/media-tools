@@ -502,6 +502,10 @@ EOF
     debug "Relying on discovered settings for MODE=STABLE"
     encoder=libx265
     encoder_settings=(-preset:v:0 slow)
+    # 10-bit is recommended for good color gradients
+    # Setting pools manually to support docker containers where ffmpeg can't always detect the number of cores
+    encoder_settings=(-pix_fmt yuv420p10le -x265-params "profile=main10:pools=$(nproc)")
+
     # At least upscale DVD content here using the fast denoiser
     video_stream="$(echo "$stream_data" | grep 'Stream #0:0')"
     [ -n "$video_stream" ] || die "Didn't find video stream in stream data"
@@ -720,6 +724,12 @@ EOF
   # Use locally installed ffmpeg, or a docker container?
   CMD=(ffmpeg)
   #CMD=(docker run --rm -v "$TOOLSDIR":"$TOOLSDIR" -v "$MOVIESDIR":"$MOVIESDIR" -w "$(pwd)" jrottenberg/ffmpeg -stats)
+
+  # Running in docker lately, I've noticed it seems stuck at two cores max. Gemini suggests ffmpeg itself may be to
+  # blame in how it detects available threads. Let's tell it how many to use, just to be safe.
+  # Continued: it turns out x265 has a completely separate setting and doesn't obey this. Find it up in the
+  # encoder_settings. I'm leaving this just because.
+  CMD+=(-threads "$(nproc)")
 
   [ -n "$USE_GPU" ] && ! [ "$NEVER_GPU" ] && CMD+=(-hwaccel cuda -hwaccel_output_format cuda)
   CMD+=(-hide_banner -y -i "$input_abs_path")
