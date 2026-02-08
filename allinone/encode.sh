@@ -501,7 +501,7 @@ EOF
   elif [ "$MODE" = STABLE ]; then
     debug "Relying on discovered settings for MODE=STABLE"
     encoder=libx265
-    encoder_settings=(-preset:v:0 slower)
+    encoder_settings=(-preset:v:0 slow)
     # At least upscale DVD content here using the fast denoiser
     video_stream="$(echo "$stream_data" | grep 'Stream #0:0')"
     [ -n "$video_stream" ] || die "Didn't find video stream in stream data"
