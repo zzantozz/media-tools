@@ -478,13 +478,16 @@ EOF
   # Listed here for my reference. Should I separate upscale from cleanup? Reportedly deinterlacing happens before
   # upscaling, so I guess I'm okay for now. Reconsider if I find something that should come after upscaling but before
   # noise reduction/sharpening.
+  #
+  # Make sure widths and heights are divisible by 2 for the yuv420 pixel format (w=-2 and h=-2 ensure this).
 
   # Best denoising for DVDs with slightly gentler unsharpening
-  dvd_upscale_super_slow="zscale=w=-1:h=1080:filter=spline36:dither=error_diffusion,nlmeans=s=4:p=7:pc=0:r=15:rc=0,unsharp=5:5:0.5:5:5:0.25"
+  dvd_upscale_super_slow="zscale=w=-2:h=1080:filter=spline36:dither=error_diffusion,nlmeans=s=4:p=7:pc=0:r=15:rc=0,unsharp=5:5:0.5:5:5:0.25"
   # Faster denoising with a little more aggressive unsharpening. This is MASSIVELY faster!
-       dvd_upscale_quick="zscale=w=-1:h=1080:filter=spline36:dither=error_diffusion,hqdn3d=1.5:1.5:6:6,unsharp=5:5:0.6:5:5:0.3"
+  dvd_upscale_width_quick="zscale=w=1920:h=-2:filter=spline36:dither=error_diffusion,hqdn3d=1.5:1.5:6:6,unsharp=5:5:0.6:5:5:0.3"
+  dvd_upscale_height_quick="zscale=w=-2:h=1080:filter=spline36:dither=error_diffusion,hqdn3d=1.5:1.5:6:6,unsharp=5:5:0.6:5:5:0.3"
   # For if I want to upscale bluray to 4k, but this will increase the file size a lot (maybe double)
-          bluray_upscale="zscale=w=-1:h=2160:filter=spline36:dither=error_diffusion,hqdn3d=1.0:1.0:4:4,unsharp=5:5:0.4:5:5:0.2"
+  bluray_upscale="zscale=w=-2:h=2160:filter=spline36:dither=error_diffusion,hqdn3d=1.0:1.0:4:4,unsharp=5:5:0.4:5:5:0.2"
   # For now, I'm not even considering doing an nlmeans bluray upscale because of how insanely long it'll take.
 
   # I think this is a good place to adjust for the MODE we're in. We've figured out most stuff and are about to use it.
@@ -506,24 +509,41 @@ EOF
     # Setting pools manually to support docker containers where ffmpeg can't always detect the number of cores
     encoder_settings=(-pix_fmt yuv420p10le -x265-params "profile=main10:pools=$(nproc)")
 
-    # At least upscale DVD content here using the fast denoiser
+    # To upscale correctly, we need to know about the incoming video size.
     video_stream="$(echo "$stream_data" | grep 'Stream #0:0')"
     [ -n "$video_stream" ] || die "Didn't find video stream in stream data"
     # This seems to be what blurays look like
     # regex='Stream #0:0.*Video:.*, ([0-9]*)x([0-9]*) \[.*\], ([0-9.]*) fps, ([0-9.]*) tbr,.*$'
     # And this is what DVDs look like
     # regex='Stream #0:0.*Video:.*, ([0-9]*)x([0-9]*) \[.*\], SAR [0-9:]* DAR [0-9:]*, ([0-9.]*) fps, ([0-9.]*) tbr,.*$'
+    # This handles both
     regex='Stream #0:0.*Video:.*, ([0-9]*)x([0-9]*) \[.*\].*, ([0-9.]*) fps, ([0-9.]*) tbr,.*$'
-    [[ "$video_stream" =~ $regex ]] || die "Video stream didn't match expected format: '$video_stream'"
-    # Problem: I want to update the VFILTERS array here, but it doesn't exist yet
-    # Also, the order will be important. Cropping has to happen first, and I need to consider where to put deinterlacing
-    # Also also, with cropping, is scaling by height going to work? I need to double check the scaling params
-    width="${BASH_REMATCH[1]}"
-    height="${BASH_REMATCH[2]}"
+    if [[ "$CROPPING" =~ ^([0-9]*):([0-9]*):[0-9]*:[0-9]*$ ]]; then
+      # If we're cropping the video, this is the size we need to look at, but cropping could be "none"
+      width="${BASH_REMATCH[1]}"
+      height="${BASH_REMATCH[2]}"
+    elif [[ "$video_stream" =~ $regex ]]; then
+      # If not cropping, then use the size of the incoming video
+      width="${BASH_REMATCH[1]}"
+      height="${BASH_REMATCH[2]}"
+    else
+      die "Couldn't determine input height and width"
+    fi
+    [ "$width" -gt 0 ] || die "Didn't get a good width, was '$width'"
+    [ "$height" -gt 0 ] || die "Didn't get a good height, was '$height'"
+
     if [ "$width" -lt 1000 ]; then
-       # Nearly half the width of 1080p (1920x1080), so let's upscale.
-       debug "Upscaling DVD content"
-       upscale_filters="$dvd_upscale_quick"
+      # Nearly half the width of 1080p (1920x1080), so let's upscale.
+      debug "Upscaling DVD content"
+      target_ratio="$(echo "1920/1080" | bc -l)"
+      actual_ratio="$(echo "$width/$height" | bc -l)"
+      if [ "$(echo "$actual_ratio > $target_ratio" | bc -l)" = 1 ]; then
+        # Width dominates actual ratio, so scale to width
+       upscale_filters="$dvd_upscale_width_quick"
+      else
+        # Height dominates actual ratio
+       upscale_filters="$dvd_upscale_height_quick"
+      fi
     fi
   else
     # Later, add support for POLISHED with the slow denoiser for DVD and possibly upscaling for bluray
