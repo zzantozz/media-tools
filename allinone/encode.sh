@@ -1,55 +1,40 @@
 #!/bin/bash -e
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
-export script_dir
 
 source "$script_dir/config"
-# Directory to scan for raw mkv's ripped from disc
-export INPUTDIR
 
 source "$script_dir/utils"
-export -f die
 
 warn() {
   echo -e "$1" >&2
 }
-export -f warn
 
 # Base directories that contain details of media processing. "cache" is for temporary things. These shouldn't be committed.
 # "data" is where information is stored about how to process specific files. This should be committed. I normally keep these
 # in the same directory as the script. "data" is committed there.
 CACHEDIR="${CACHEDIR:-"$script_dir/cache"}"
-export CACHEDIR
 DATADIR="${DATADIR:-"$script_dir/data"}"
-export DATADIR
 LOCKDIR="${LOCKDIR:-"$CACHEDIR/locks"}"
-export LOCKDIR
 
 # Contains named files representing files already encoded. Remove a file to make it get processed again.
 DONEDIR="$CACHEDIR/done"
-export DONEDIR
 # Contains the ffmpeg logs to ensure an encode finished successfully
 LOGDIR="$CACHEDIR/log"
-export LOGDIR
 # Contains config files with data for each movie file to be encoded.
 CONFIGDIR=${CONFIGDIR:-"$DATADIR/config"}
-export CONFIGDIR
 # Root directory of movies library, where final transcoded movies go, possibly in a subdirectory to organize
 # related items the way Plex likes them.
 MOVIESDIR=${MOVIESDIR:-"/mnt/plex-media/plex-media-server/encoded/movies"}
-export MOVIESDIR
 # Root directory of tv shows library, where final transcoded shows go.
 TVSHOWSDIR=${TVSHOWSDIR:-"/mnt/plex-media/plex-media-server/encoded/tv-shows"}
-export TVSHOWSDIR
 # Directory holding general ripping tools
 TOOLSDIR=${TOOLSDIR:-"$script_dir/.."}
-export TOOLSDIR
 
 function debug {
   [[ "$DEBUG" =~ "encode" ]] && echo -e "$1" 1>&2
   return 0
 }
-export -f debug
 
 [ -d "$CACHEDIR" ] || die "CACHEDIR doesn't exist: $CACHEDIR"
 [ -d "$DATADIR" ] || die "DATADIR doesn't exist: $DATADIR"
@@ -65,16 +50,21 @@ if ! [ "$MODE" = FIRST_PASS ] && ! [ "$MODE" = STABLE ] && ! [ "$MODE" = POLISHE
     WARNING!!! POLISHED may be EXTREMELY SLOW!"
 fi
 
+if [ -n "$ALT_OUTPUT_DIRS" ]; then
+  IFS=: read -ra alt_output_dirs <<<"$ALT_OUTPUT_DIRS"
+  debug "Using additional dirs for determining finished status:"
+  for dir in "${alt_output_dirs[@]}"; do
+    debug " - $dir"
+  done
+fi
+
 # Ensure cache subdirectories exist.
 mkdir -p "$DONEDIR"
 mkdir -p "$LOGDIR"
 
 # List of outputs to build the map values from in the function. Can't be an array because those can't be exported.
+# Note: not exported anymore! It could be an array!
 OUTSTRING="[outa] [outb] [outc] [outd] [oute] [outf] [outg] [outh] [outi] [outj] [outkl] [outm] [outn] [outo] [outp] [outq]"
-export OUTSTRING
-
-# If DRYRUN is set, export it so the function sees it
-[ -n "$DRYRUN" ] && export DRYRUN
 
 debug "Running from $script_dir"
 
@@ -112,7 +102,6 @@ function cleanup {
     done
   fi
 }
-export -f cleanup
 
 function encode_one {
   [ -f "$1" ] || {
@@ -120,15 +109,6 @@ function encode_one {
     return 1
   }
   set -e
-
-  # This here for now because I can't export it
-  if [ -n "$ALT_OUTPUT_DIRS" ]; then
-    IFS=: read -ra alt_output_dirs <<<"$ALT_OUTPUT_DIRS"
-    debug "Using additional dirs for determining finished status:"
-    for dir in "${alt_output_dirs[@]}"; do
-	debug " - $dir"
-    done
-  fi
 
   # Absolute path to the input file
   input_abs_path="$(realpath "$1")"
@@ -843,12 +823,10 @@ EOF
   # condition here...
   rm -f "$lock_file"
 }
-export -f encode_one
 
 handle_input_file() {
   check_for_stop "$1"
 }
-export -f handle_input_file
 
 check_for_stop() {
   if [ -f "$script_dir/stop" ]; then
@@ -858,7 +836,6 @@ check_for_stop() {
     filter_input "$1"
   fi
 }
-export -f check_for_stop
 
 filter_input() {
     if [ -z "$FILTER_INPUT" ] || echo "$1" | grep -Ei "$FILTER_INPUT" &>/dev/null; then
@@ -867,7 +844,6 @@ filter_input() {
 	debug "Filtered out '$1'"
     fi
 }
-export -f filter_input
 
 [ $# -eq 1 ] && ONE=true
 [ "$ONE" = true ] && handle_input_file "$1"
