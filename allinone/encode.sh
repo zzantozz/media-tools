@@ -10,6 +10,11 @@ export INPUTDIR
 source "$script_dir/utils"
 export -f die
 
+warn() {
+  echo -e "$1" >&2
+}
+export -f warn
+
 # Base directories that contain details of media processing. "cache" is for temporary things. These shouldn't be committed.
 # "data" is where information is stored about how to process specific files. This should be committed. I normally keep these
 # in the same directory as the script. "data" is committed there.
@@ -112,7 +117,7 @@ export -f cleanup
 function encode_one {
   [ -f "$1" ] || {
     echo "File doesn't exist: '$1'" 2>&1
-    exit 1
+    return 1
   }
   set -e
 
@@ -134,7 +139,7 @@ function encode_one {
     [ "$in_pix_fmt" = "yuv420p" ] || {
       echo "Only handling pixel format yuv42p. Input has format '$in_pix_fmt'" >&2
       echo " - path: $input_abs_path" >&2
-      exit 1
+      return 1
     }
   fi
 
@@ -175,23 +180,23 @@ function encode_one {
   # for certain files.
   [ -f "$config_file" ] || {
     echo "Missing config file: $config_file" >&2
-    exit 1
+    return 1
   }
   [ -f "$main_config" ] || {
     echo "Missing main config file: $main_config" >&2
-    exit 1
+    return 1
   }
   debug "Loading main config: $main_config"
   # shellcheck disable=SC1090
   source "$main_config" || {
     echo "Failed to source $main_config" >&2
-    exit 1
+    return 1
   }
   debug "Using config: $config_file"
   # shellcheck disable=SC1090
   source "$config_file" || {
     echo "Failed to source $config_file" >&2
-    exit 1
+    return 1
   }
 
   # Figure out what our output path is. This will be an absolute
@@ -223,7 +228,7 @@ function encode_one {
   [ -n "$MAIN_NAME" ] || {
     echo "Missing MAIN_NAME from configuration. It should be set in the main config" >&2
     echo "file for the title at: $main_config" >&2
-    exit 1
+    return 1
   }
 
   # Wait, as a special case, tv show inputs will likely have the
@@ -249,7 +254,7 @@ function encode_one {
     echo "1. OUTPUTNAME, giving the relative path of the output file, or" >&2
     echo "2. both SEASON and EPISODE for a tv show so that an output path can be built." >&2
     echo "   (Except if the input path contains /Season xxx/, then SEASON can come from there." >&2
-    exit 1
+    return 1
   fi
 
   # Also check for season in the output path! If the disks aren't ripped into the typical "tv show" structure,
@@ -279,12 +284,14 @@ function encode_one {
       base_output_dir="$MOVIESDIR"
       required_file="$base_output_dir/$MAIN_NAME/$MAIN_NAME.mkv"
       [ -f "$required_file" ] || \
-        die "Need a bogus movie file to support tv specials as movies! at: $required_file"
+        warn "Need a bogus movie file to support tv specials as movies! at: $required_file"
+        return 1
     else
       base_output_dir="$TVSHOWSDIR"
     fi
   else
-    die "No MAIN_TYPE configured, and couldn't determine one."
+    warn "No MAIN_TYPE configured, and couldn't determine one."
+    return 1
   fi
 
   # Check if the input title needs to be split. If so, the output path is dynamic and has to be recalculated for each
@@ -292,12 +299,18 @@ function encode_one {
   # output based on splits. Do that before using the output path for anything! I.e. the first output file will get
   # number 1, the second number 2, etc.
   if [ "$SPLIT" = true ]; then
-    [ -n "${SPLIT_CHAPTER_STARTS[*]}" ] ||
-      die "Config calls for splitting, but no SPLIT_CHAPTER_STARTS is set"
-    [ -n "$SPLIT_START_NUMBER" ] ||
-      die "Config calls for splitting, but no SPLIT_START_NUMBER is set"
-    chapter_times_raw=$("$TOOLSDIR/chapters.sh" -i "$input_abs_path") ||
-      die "Failed to read chapter times from input"
+    [ -n "${SPLIT_CHAPTER_STARTS[*]}" ] || {
+      warn "Config calls for splitting, but no SPLIT_CHAPTER_STARTS is set"
+      return 1
+    }
+    [ -n "$SPLIT_START_NUMBER" ] || {
+      warn "Config calls for splitting, but no SPLIT_START_NUMBER is set"
+      return 1
+    }
+    chapter_times_raw=$("$TOOLSDIR/chapters.sh" -i "$input_abs_path") || {
+      warn "Failed to read chapter times from input"
+      return 1
+    }
     IFS=' ' read -r -a chapter_times <<< "$chapter_times_raw"
     split_times=()
     for chapter in "${SPLIT_CHAPTER_STARTS[@]}"; do
@@ -402,10 +415,14 @@ function encode_one {
     else
       echo "Analyzing $input_rel_path"
       echo " - $(date)"
-      ANALYSIS=$("$TOOLSDIR/analyze.sh" "$input_abs_path" -k "$input_rel_path") || \
-        die "Analysis failed on '$input_abs_path'"
-      ( mkdir -p "$(dirname "$analysis_cache_file")" && echo "$ANALYSIS" > "$analysis_cache_file" ) || \
-        die "Failed to write analysis to cache: $analysis_cache_file"
+      ANALYSIS=$("$TOOLSDIR/analyze.sh" "$input_abs_path" -k "$input_rel_path") || {
+        warn "Analysis failed on '$input_abs_path'"
+        return 1
+      }
+      ( mkdir -p "$(dirname "$analysis_cache_file")" && echo "$ANALYSIS" > "$analysis_cache_file" ) || {
+        warn "Failed to write analysis to cache: $analysis_cache_file"
+        return 1
+      }
       echo " - $(date)"
     fi
     eval "$ANALYSIS"
@@ -424,7 +441,7 @@ function encode_one {
     echo "Detected: $CROPPING" >&2
     # I want to abort here, but I found a movie where this is actually needed. Guns of Navarone detects a crop of 710:358:4:60, but
     # makes the video all crazy stretched out. 710:360:4:60 works fine.
-    #exit 1
+    #return 1
   }
   CROPPING="${CONFIG_CROPPING:-$CROPPING}"
   debug "Interlacing: $INTERLACED"
@@ -432,14 +449,14 @@ function encode_one {
     echo "Invalid interlace value: '$INTERLACED'" >&2
     echo " - rel path: $input_rel_path" >&2
     echo " - config  : $config_file" >&2
-    exit 1
+    return 1
   }
   debug "Cropping: $CROPPING"
   [ -z "$CROPPING" ] && {
     echo "No cropping determined. There should always be a value here." >&2
     echo " - rel path: $input_rel_path" >&2
     echo " - config  : $config_file" >&2
-    exit 1
+    return 1
   }
 
   VQ=$("$TOOLSDIR/quality.sh" "$input_abs_path")
@@ -511,7 +528,10 @@ EOF
 
     # To upscale correctly, we need to know about the incoming video size.
     video_stream="$(echo "$stream_data" | grep 'Stream #0:0')"
-    [ -n "$video_stream" ] || die "Didn't find video stream in stream data"
+    [ -n "$video_stream" ] || {
+      warn "Didn't find video stream in stream data"
+      return 1
+    }
     # This seems to be what blurays look like
     # regex='Stream #0:0.*Video:.*, ([0-9]*)x([0-9]*) \[.*\], ([0-9.]*) fps, ([0-9.]*) tbr,.*$'
     # And this is what DVDs look like
@@ -527,11 +547,17 @@ EOF
       width="${BASH_REMATCH[1]}"
       height="${BASH_REMATCH[2]}"
     else
-      die "Couldn't determine input height and width"
+      warn "Couldn't determine input height and width"
+      return 1
     fi
-    [ "$width" -gt 0 ] || die "Didn't get a good width, was '$width'"
-    [ "$height" -gt 0 ] || die "Didn't get a good height, was '$height'"
-
+    [ "$width" -gt 0 ] || {
+      warn "Didn't get a good width, was '$width'"
+      return 1
+    }
+    [ "$height" -gt 0 ] || {
+      warn "Didn't get a good height, was '$height'"
+      return 1
+    }
     if [ "$width" -lt 1000 ]; then
       # Nearly half the width of 1080p (1920x1080), so let's upscale.
       debug "Upscaling DVD content"
@@ -547,13 +573,20 @@ EOF
     fi
   else
     # Later, add support for POLISHED with the slow denoiser for DVD and possibly upscaling for bluray
-    die "Unsupported MODE: '$MODE'"
+    warn "Unsupported MODE: '$MODE'"
+    return 1
   fi
 
   if [ -f "$DATADIR/cuts/$input_rel_path" ]; then
-    [ -z "$upscale_filters" ] || die "I haven't considered how to upscale with cuts."
+    [ -z "$upscale_filters" ] || {
+      warn "I haven't considered how to upscale with cuts."
+      return 1
+    }
     # Note: cuts were added before splitting and are based on input path. I have to rethink how this works with splitting.
-    [ "$SPLIT" = true ] && die "Can't use cuts with splits until I rewrite this!"
+    [ "$SPLIT" = true ] && {
+      warn "Can't use cuts with splits until I rewrite this!"
+      return 1
+    }
     concat_cache_file="$CACHEDIR/concat/$input_rel_path"
     FILTERCMD=("$script_dir/filter.sh" "$input_abs_path" -c "$concat_cache_file")
     EXTRAS=()
@@ -568,7 +601,7 @@ EOF
     debug "Calculate filter args with: $printable"
     COMPLEXFILTER=$("${FILTERCMD[@]}") || {
       echo "filter.sh failed to determine complex filter string" >&2
-      exit 1
+      return 1
     }
     debug "complex_filter: $COMPLEXFILTER"
   else
@@ -580,7 +613,7 @@ EOF
   fi
   [ -n "$KEEP_STREAMS" ] || {
     echo "KEEP_STREAMS should be known by now" >&2
-    exit 1
+    return 1
   }
   MAPS=""
   encodings=()
@@ -610,14 +643,14 @@ EOF
             ;;
           *)
             echo "Stream $stream has unkown type $stream_type" >&2
-            exit 1
+            return 1
             ;;
         esac
       elif [[ "$line" =~ mjpeg\ .*\(attached\ pic\) ]]; then
         :
       else
         echo "Couldn't detect stream type" >&2
-        exit 1
+        return 1
       fi
       s_idx=$((s_idx+1))
     done <<<"$stream_data"
@@ -658,7 +691,7 @@ EOF
     echo "-filter:v in ffmpeg. See how we got here." >&2
     echo "Simple filter string : $VFILTERSTRING" >&2
     echo "Complex filter string: $COMPLEXFILTER" >&2
-    exit 1
+    return 1
   fi
 
   # Second loop to actually process the discovered outputs. This builds the output part of the ffmpeg command by putting
@@ -795,14 +828,15 @@ EOF
       output_abs_path="${output_abs_paths[i]}"
       done_file="${done_files[i]}"
       if [ -z "$output_tmp_path" ] || [ -z "$output_abs_path" ] || [ -z "$done_file" ]; then
-        die "Something went horribly wrong: tmp='$output_tmp_path' abs='$output_abs_path' done='$done_file'"
+        warn "Something went horribly wrong: tmp='$output_tmp_path' abs='$output_abs_path' done='$done_file'"
+        return 1
       fi
       mv "$output_tmp_path" "$output_abs_path" && mkdir -p "$(dirname "$done_file")" && touch "$done_file"
     done
   else
     echo ""
     echo "Encoding not done?"
-    exit 1
+    return 1
   fi
   echo ""
   # Unlock after marking it done, or someone else may pick it up. Of course, there's still a slight chance of race
@@ -837,4 +871,6 @@ export -f filter_input
 
 [ $# -eq 1 ] && ONE=true
 [ "$ONE" = true ] && handle_input_file "$1"
-[ -z "$ONE" ] && "$script_dir/ls-inputs.sh" -sz | xargs -0I {} bash -c 'handle_input_file "{}" || exit 255'
+[ -z "$ONE" ] && while read -r input; do
+  handle_input_file "$input" || true
+done <<<"$("$script_dir/ls-inputs.sh" -s)"
