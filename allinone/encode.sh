@@ -507,7 +507,7 @@ EOF
     encoder_settings=(-preset:v:0 slow)
     # 10-bit is recommended for good color gradients
     # Setting pools manually to support docker containers where ffmpeg can't always detect the number of cores
-    encoder_settings=(-pix_fmt yuv420p10le -x265-params "profile=main10:pools=$(nproc)")
+    encoder_settings+=(-pix_fmt yuv420p10le -x265-params "pools=$(nproc)")
 
     # To upscale correctly, we need to know about the incoming video size.
     video_stream="$(echo "$stream_data" | grep 'Stream #0:0')"
