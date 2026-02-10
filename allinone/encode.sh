@@ -74,7 +74,7 @@ export OUTSTRING
 debug "Running from $script_dir"
 
 function cleanup {
-  if [ -n "$lock_file" ] && [ "$locked_by_me" = true ]; then
+  if [ -f "$lock_file" ] && [ "$locked_by_me" = true ]; then
     echo "Clean up lock file: '$lock_file'"
     rm -f "$lock_file"
   fi
