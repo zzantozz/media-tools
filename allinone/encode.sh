@@ -819,6 +819,6 @@ filter_input() {
 }
 export -f filter_input
 
-[ $# -eq 1 ] && ONE=true
-[ "$ONE" = true ] && handle_input_file "$1"
-[ -z "$ONE" ] && "$script_dir/ls-inputs.sh" -sz | xargs -0I {} bash -c 'IFS="|" read -ra input_fields <<<"{}"; handle_input "${input_fields[@]}" || exit 255'
+ls_opts_raw="${LS_OPTS:--s}"
+read -ra ls_opts <<<"$ls_opts_raw"
+"$script_dir/ls-inputs.sh" "${ls_opts[@]}" | xargs -0I {} bash -c 'IFS="|" read -ra input_fields <<<"{}"; handle_input "${input_fields[@]}" || exit 255'
