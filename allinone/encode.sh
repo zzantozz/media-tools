@@ -824,8 +824,8 @@ EOF
   rm -f "$lock_file"
 }
 
-handle_input_file() {
-  check_for_stop "$1"
+handle_input() {
+  check_for_stop "$@"
 }
 
 check_for_stop() {
@@ -833,20 +833,19 @@ check_for_stop() {
     echo "Stop signalled, stopping"
     return 1
   else
-    filter_input "$1"
+    filter_input "$@"
   fi
 }
 
 filter_input() {
-    if [ -z "$FILTER_INPUT" ] || echo "$1" | grep -Ei "$FILTER_INPUT" &>/dev/null; then
-        encode_one "$1"
-    else
-	debug "Filtered out '$1'"
-    fi
+  input_path="$1"
+  if [ -z "$FILTER_INPUT" ] || echo "$input_path" | grep -Ei "$FILTER_INPUT" &>/dev/null; then
+    encode_one "$@"
+  else
+    debug "Filtered out '$input_path'"
+  fi
 }
 
-[ $# -eq 1 ] && ONE=true
-[ "$ONE" = true ] && handle_input_file "$1"
-[ -z "$ONE" ] && while read -r input; do
-  handle_input_file "$input" || true
+while read -r input_path; do
+  handle_input "$input_path" || true
 done <<<"$("$script_dir/ls-inputs.sh" -s)"
