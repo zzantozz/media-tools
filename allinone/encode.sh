@@ -831,7 +831,9 @@ filter_input() {
   fi
 }
 
+ls_opts_raw="${LS_OPTS:--s}"
+read -ra ls_opts <<<"$ls_opts_raw"
 while read -r input; do
   IFS='|' read -ra input_fields <<<"$input"
   handle_input "${input_fields[@]}" || true
-done <<<"$("$script_dir/ls-inputs.sh" -s)"
+done <<<"$("$script_dir/ls-inputs.sh" "${ls_opts[@]}")"
