@@ -40,7 +40,6 @@ function debug {
 [ -d "$DATADIR" ] || die "DATADIR doesn't exist: $DATADIR"
 [ -d "$LOCKDIR" ] || die "LOCKDIR doesn't exist: $LOCKDIR"
 [ -d "$CONFIGDIR" ] || die "CONFIGDIR doesn't exist: $CONFIGDIR"
-[ -d "$INPUTDIR" ] || die "INPUTDIR doesn't exist: $INPUTDIR"
 [ -d "$MOVIESDIR" ] || die "MOVIESDIR doesn't exist: $MOVIESDIR"
 [ -d "$TVSHOWSDIR" ] || die "TVSHOWSDIR doesn't exist: $TVSHOWSDIR"
 [ -d "$TOOLSDIR" ] || die "TOOLSDIR doesn't exist: $TOOLSDIR"
@@ -104,14 +103,16 @@ function cleanup {
 }
 
 function encode_one {
-  [ -f "$1" ] || {
-    echo "File doesn't exist: '$1'" 2>&1
+  local input_dir="$1"
+  local input_rel_path="$2"
+  # Absolute path to the input file
+  local input_abs_path
+  input_abs_path="$(realpath "$input_dir/$input_rel_path")"
+  [ -f "$input_abs_path" ] || {
+    echo "File doesn't exist: '$input_abs_path'" 2>&1
     return 1
   }
   set -e
-
-  # Absolute path to the input file
-  local input_abs_path="$(realpath "$1")"
 
   # Verify pixel format because I have to specify it for GPU encoding, and I'm not certain what happens if you change it.
   local in_pix_fmt="$(ffprobe -v error -select_streams v:0 -show_entries stream=pix_fmt -of default=noprint_wrappers=1:nokey=1 "$input_abs_path")"
@@ -122,22 +123,6 @@ function encode_one {
       return 1
     }
   fi
-
-  # Now we have to figure out what config file to look for. The
-  # input could be either a movie or a tv show. A movie file might
-  # be:
-  #
-  # /media/blah/ripping/media-in/MenInBlack/title01.mkv
-  #
-  # A tv show would be more like:
-  #
-  # /media/blah/ripping/media-in/MASH/Season 4/Disk 2/title01.mkv
-  #
-  # In either case, removing the input dir from the front of the
-  # file name gives us a path we can use to map to a config file. In
-  # other words, the config file name matches the relative path to
-  # the input file.
-  local input_rel_path="${input_abs_path#$INPUTDIR/}"
 
   # Now load the config file so that we can refer to the information
   # in it as needed. A config file is required for every input file
@@ -838,7 +823,7 @@ check_for_stop() {
 }
 
 filter_input() {
-  input_path="$1"
+  input_path="$2"
   if [ -z "$FILTER_INPUT" ] || echo "$input_path" | grep -Ei "$FILTER_INPUT" &>/dev/null; then
     encode_one "$@"
   else
@@ -846,6 +831,7 @@ filter_input() {
   fi
 }
 
-while read -r input_path; do
-  handle_input "$input_path" || true
+while read -r input; do
+  IFS='|' read -ra input_fields <<<"$input"
+  handle_input "${input_fields[@]}" || true
 done <<<"$("$script_dir/ls-inputs.sh" -s)"

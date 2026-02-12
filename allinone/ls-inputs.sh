@@ -8,10 +8,38 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 source "$script_dir/config"
 source "$script_dir/utils"
 
-[ -d "$input_dir" ] || die "Input dir doesn't exist: '$input_dir'"
+if [ -n "$INPUT_DIRS" ]; then
+  IFS=: read -ra input_dirs <<<"$INPUT_DIRS"
+else
+  input_dirs=("$input_dir")
+fi
+
+for dir in "${input_dirs[@]}"; do
+  [ -d "$dir" ] || die "Input dir doesn't exist: '$input_dir'"
+done
 
 usage() {
-  echo "Learn how to use it."
+  echo "USAGE"
+  echo "    INPUT_DIRS=/a:/b:/c $0 [-s|-S] [-r] [-z]"
+  echo
+  echo "DESCRIPTION"
+  echo "    Finds video files in input directories and writes them to stdout in a format understandable by encode.sh."
+  echo
+  echo "OPTIONS"
+  echo "    INPUT_DIRS"
+  echo "        A list of input directories to scan for transcodable video files. Separated by colons."
+  echo
+  echo "    -s"
+  echo "        Sort naturally, meaning by name."
+  echo
+  echo "    -S"
+  echo "        Sort by size."
+  echo
+  echo "    -r"
+  echo "        Reverse the list after sorting."
+  echo
+  echo "    -z"
+  echo "        Delimit results with nul instead of a newline."
 }
 
 sort=none
@@ -42,17 +70,20 @@ if [ "$reverse" = true ] && [ "$sort" = none ]; then
   die "Can't reverse if not sorting!"
 fi
 
-find_cmd=(find "$input_dir" -name '*.mkv' -mmin +2)
+find_cmd=(find "${input_dirs[@]}" -name '*.mkv' -mmin +2 -printf)
+printf_format=""
 sort_cmd=()
 cleanup_cmd=()
-zero_cmd=()
 
 if [ "$sort" = size ]; then
-  find_cmd+=(-exec ls -s {} \;)
+  printf_format+='%s %H|%P'
   sort_cmd=(sort -n)
   cleanup_cmd=(cut -d ' ' -f 2-)
 elif [ "$sort" = natural ]; then
-  sort_cmd=(sort)
+  printf_format+='%H|%P'
+  sort_cmd=(sort -k 2 -t '|')
+else
+  printf_format+='%H|%P'
 fi
 
 if [ "$reverse" = true ]; then
@@ -60,15 +91,19 @@ if [ "$reverse" = true ]; then
 fi
 
 if [ "$zero" = true ]; then
-  zero_cmd=(tr '\n' '\0')
+  printf_format+='\0'
+else
+  printf_format+='\n'
 fi
+
+find_cmd+=("$printf_format")
 
 _find() {
   "${find_cmd[@]}"
 }
 
 _sort() {
-  if [ -n "$sort_cmd" ]; then
+  if [ -n "${sort_cmd[*]}" ]; then
     "${sort_cmd[@]}"
   else
     cat -
@@ -76,22 +111,14 @@ _sort() {
 }
 
 _cleanup() {
-  if [ -n "$cleanup_cmd" ]; then
+  if [ -n "${cleanup_cmd[*]}" ]; then
     "${cleanup_cmd[@]}"
   else
     cat -
   fi
 }
 
-_zero() {
-  if [ -n "$zero_cmd" ]; then
-    "${zero_cmd[@]}"
-  else
-    cat -
-  fi
-}
-
-_find | _sort | _cleanup | _zero
+_find | _sort | _cleanup
 
 exit 0
 
