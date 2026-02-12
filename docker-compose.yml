@@ -21,8 +21,8 @@ services:
       resources:
         limits:
           # Uncomment this and comment the {} to enforce cpu limit. This will filter into the `nproc` call
-	  # in the encode script.
-          #cpus: '2.0'
+          # in the encode script.
+#          cpus: '3.0'
           {}
     volumes:
       - /mnt/d:/mnt/d
@@ -34,6 +34,8 @@ services:
       - /mnt/tmp1:/mnt/tmp1
       - /mnt/tmp2:/mnt/tmp2
     environment:
+      - DEBUG=${DEBUG:-}
+      - LS_OPTS=${LS_OPTS:-}
       - TVSHOWSDIR=/mnt/encode-target/tv-shows
       - MOVIESDIR=/mnt/encode-target/movies
       - INPUTDIR=${INPUTDIR:-/mnt/j/ripping}
