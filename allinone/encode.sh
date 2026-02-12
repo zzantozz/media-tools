@@ -75,14 +75,14 @@ function cleanup {
   fi
   if [ -n "${output_tmp_paths[*]}" ]; then
     for i in "${!output_tmp_paths[@]}"; do
-      status=clean_it
-      tmp_output="${output_tmp_paths[i]}"
+      local status=clean_it
+      local tmp_output="${output_tmp_paths[i]}"
       if [ -f "$tmp_output" ]; then
         echo "Checking if we should should keep or clean up '$tmp_output'"
-        j=$((i+1))
-        next_tmp_output="${output_tmp_paths[j]}"
+        local j=$((i+1))
+        local next_tmp_output="${output_tmp_paths[j]}"
         if [ -n "$next_tmp_output" ] && [ -f "$next_tmp_output" ]; then
-          size="$(cat "$next_tmp_output" | wc -c)"
+          local size="$(cat "$next_tmp_output" | wc -c)"
           # Check for non-trivial size. In practice, non-started files seem to end up about 5k?
           if [ "$size" -gt 102400 ]; then
             # The current one must have finished because the next one was at least started
@@ -90,8 +90,8 @@ function cleanup {
           fi
         fi
         if [ "$status" = keep_it ]; then
-          abs_output="${output_abs_paths[i]}"
-          done_file="${done_files[i]}"
+          local abs_output="${output_abs_paths[i]}"
+          local done_file="${done_files[i]}"
           echo "It's done! Keep it!"
           mv "$tmp_output" "$abs_output" && touch "$done_file"
         else
@@ -111,10 +111,10 @@ function encode_one {
   set -e
 
   # Absolute path to the input file
-  input_abs_path="$(realpath "$1")"
+  local input_abs_path="$(realpath "$1")"
 
   # Verify pixel format because I have to specify it for GPU encoding, and I'm not certain what happens if you change it.
-  in_pix_fmt="$(ffprobe -v error -select_streams v:0 -show_entries stream=pix_fmt -of default=noprint_wrappers=1:nokey=1 "$input_abs_path")"
+  local in_pix_fmt="$(ffprobe -v error -select_streams v:0 -show_entries stream=pix_fmt -of default=noprint_wrappers=1:nokey=1 "$input_abs_path")"
   if [ -n "$USE_GPU" ] && [ -z "$NEVER_GPU" ]; then
     [ "$in_pix_fmt" = "yuv420p" ] || {
       echo "Only handling pixel format yuv42p. Input has format '$in_pix_fmt'" >&2
@@ -137,7 +137,7 @@ function encode_one {
   # file name gives us a path we can use to map to a config file. In
   # other words, the config file name matches the relative path to
   # the input file.
-  input_rel_path="${input_abs_path#$INPUTDIR/}"
+  local input_rel_path="${input_abs_path#$INPUTDIR/}"
 
   # Now load the config file so that we can refer to the information
   # in it as needed. A config file is required for every input file
@@ -148,12 +148,12 @@ function encode_one {
   # for encoding BSG, which used the details of the streams in an
   # episode as a signature to determine which streams should be
   # kept.
-  config_file="$CONFIGDIR/$input_rel_path"
+  local config_file="$CONFIGDIR/$input_rel_path"
 
   # Also at the root of each show's or movie's input dir for a file
   # named "main" that contains key details for the whole show or
   # movie.
-  main_config="$CONFIGDIR/${input_rel_path%%/*}/main"
+  local main_config="$CONFIGDIR/${input_rel_path%%/*}/main"
 
   # Now get both configs loaded. Load main config first, in case
   # there's something I'd like to set at the top level but override
@@ -214,20 +214,20 @@ function encode_one {
   # Wait, as a special case, tv show inputs will likely have the
   # season in the input path, so look for it there if it's not in
   # the config.
-  season_regex="[/ ](Season|SEASON) ([[:digit:].]+)[/ ]"
+  local season_regex="[/ ](Season|SEASON) ([[:digit:].]+)[/ ]"
   if [ -z "$SEASON" ] && [[ "$input_rel_path" =~ $season_regex ]]; then
-    SEASON="${BASH_REMATCH[2]}"
+    local SEASON="${BASH_REMATCH[2]}"
   fi
 
   if [ -n "$OUTPUTNAME" ]; then
-    output_rel_path="$MAIN_NAME/$OUTPUTNAME"
+    local output_rel_path="$MAIN_NAME/$OUTPUTNAME"
   elif [ -n "$SEASON" ] && [ -n "$EPISODE" ]; then
     # This only does 2-digit season and episode; probably need to
     # allow for three at some point. Do it always? Or based on
     # config?
-    padded_season="$(printf %.2d ${SEASON#0})"
-    padded_episode="$(printf %.2d ${EPISODE#0})"
-    output_rel_path="$MAIN_NAME/Season $SEASON/$MAIN_NAME s${padded_season}e${padded_episode}.mkv"
+    local padded_season="$(printf %.2d ${SEASON#0})"
+    local padded_episode="$(printf %.2d ${EPISODE#0})"
+    local output_rel_path="$MAIN_NAME/Season $SEASON/$MAIN_NAME s${padded_season}e${padded_episode}.mkv"
   else
     echo "Missing fields from config: $config_file" >&2
     echo "It must contain either:" >&2
@@ -240,15 +240,15 @@ function encode_one {
   # Also check for season in the output path! If the disks aren't ripped into the typical "tv show" structure,
   # but have an OUTPUTNAME that puts the outputs in that structure, the output would have a season in it.
   if [ -z "$SEASON" ] && [[ "$output_rel_path" =~ $season_regex ]]; then
-    SEASON="${BASH_REMATCH[1]}"
+    local SEASON="${BASH_REMATCH[1]}"
   fi
 
   # Now figure out if we're encoding a movie or a tv episode. We an make a guess based on whether a "season" is
   # involved.
   if [ -n "$SEASON" ]; then
-    MAIN_TYPE_GUESS=tvshow
+    local MAIN_TYPE_GUESS=tvshow
   else
-    MAIN_TYPE_GUESS=movie
+    local MAIN_TYPE_GUESS=movie
   fi
 
   # If the MAIN_TYPE isn't configured (usually isn't), then fall back to our guess.
@@ -256,18 +256,18 @@ function encode_one {
 
   # Based on what we know about the type, decide whether to put it in the movies output dir or the tv output dir.
   if [ "$MAIN_TYPE" = movie ]; then
-    base_output_dir="$MOVIESDIR"
+    local base_output_dir="$MOVIESDIR"
   elif [ "$MAIN_TYPE" = tvshow ] || [ "$MAIN_TYPE" = tv_show ]; then
     # If it's a tv special, we might want to store it under a movie for organization. Plex is bad at handling tv
     # specials.
     if [ "$SPECIAL_TYPE" = movie ] && [ -n "$OUTPUTNAME" ] && ! [[ "$OUTPUTNAME" =~ ^Season ]]; then
-      base_output_dir="$MOVIESDIR"
-      required_file="$base_output_dir/$MAIN_NAME/$MAIN_NAME.mkv"
+      local base_output_dir="$MOVIESDIR"
+      local required_file="$base_output_dir/$MAIN_NAME/$MAIN_NAME.mkv"
       [ -f "$required_file" ] || \
         warn "Need a bogus movie file to support tv specials as movies! at: $required_file"
         return 1
     else
-      base_output_dir="$TVSHOWSDIR"
+      local base_output_dir="$TVSHOWSDIR"
     fi
   else
     warn "No MAIN_TYPE configured, and couldn't determine one."
@@ -287,30 +287,30 @@ function encode_one {
       warn "Config calls for splitting, but no SPLIT_START_NUMBER is set"
       return 1
     }
-    chapter_times_raw=$("$TOOLSDIR/chapters.sh" -i "$input_abs_path") || {
+    local chapter_times_raw=$("$TOOLSDIR/chapters.sh" -i "$input_abs_path") || {
       warn "Failed to read chapter times from input"
       return 1
     }
     IFS=' ' read -r -a chapter_times <<< "$chapter_times_raw"
-    split_times=()
+    local split_times=()
     for chapter in "${SPLIT_CHAPTER_STARTS[@]}"; do
       split_times+=("${chapter_times[$chapter]}")
     done
     debug "Splitting video at chapters ${SPLIT_CHAPTER_STARTS[*]}"
     debug "  which corresponds to timestamps ${split_times[*]}"
   else
-    split_times=(0)
+    local split_times=(0)
   fi
 
   [ "$QUALITY" = "rough" ] && {
-    output_rel_path="${output_rel_path//\//_}"
-    base_output_dir="$TOOLSDIR"
+    local output_rel_path="${output_rel_path//\//_}"
+    local base_output_dir="$TOOLSDIR"
   }
 
-  output_args=()
-  output_tmp_paths=()
-  output_abs_paths=()
-  done_files=()
+  local output_args=()
+  local output_tmp_paths=()
+  local output_abs_paths=()
+  local done_files=()
   # First loop to determine outputs. It's this complicated to support splitting one input into multiple outputs (looking
   # at you, Chuck bluray Season 2!!). This only reads config data, figures out if we're splitting, and then determines
   # which of the outputs, if any, are already done. It stores everything else in the above variables so that a later
@@ -320,23 +320,23 @@ function encode_one {
   # anything that causes side effects, like analyze.
   for i in "${!split_times[@]}"; do
     if [ "$SPLIT" = true ]; then
-      output_video_num=$((SPLIT_START_NUMBER + i))
-      formatted_output_rel_path="$(printf "$output_rel_path" "$output_video_num")"
+      local output_video_num=$((SPLIT_START_NUMBER + i))
+      local formatted_output_rel_path="$(printf "$output_rel_path" "$output_video_num")"
     else
-      formatted_output_rel_path="$output_rel_path"
+      local formatted_output_rel_path="$output_rel_path"
     fi
 
-    output_abs_path="$base_output_dir/$formatted_output_rel_path"
-    output_tmp_path="$base_output_dir/$(dirname "$formatted_output_rel_path")/$(basename "$formatted_output_rel_path").part"
+    local output_abs_path="$base_output_dir/$formatted_output_rel_path"
+    local output_tmp_path="$base_output_dir/$(dirname "$formatted_output_rel_path")/$(basename "$formatted_output_rel_path").part"
 
-    done_file="$DONEDIR/$MODE/$formatted_output_rel_path"
-    already_done=false
+    local done_file="$DONEDIR/$MODE/$formatted_output_rel_path"
+    local already_done=false
     debug "Check if already done; done file: $done_file"
     if [ -f "$done_file" ]; then
       debug "  done file exists"
       already_done=true
     fi
-    output_exists=false
+    local output_exists=false
     [ -f "$output_abs_path" ] && output_exists=true
     for dir in "${alt_output_dirs[@]}"; do
 	    [ -f "$dir/$formatted_output_rel_path" ] && output_exists=true
@@ -374,28 +374,28 @@ function encode_one {
 
   # We've figured out all we can and know whether we need to actually encode the video now. If we've made it here, we're
   # doing the encode, so lock the input so that other instances can't try to process the same file.
-  lock_key="$(echo "$input_abs_path" | sed -r "s/[:/ '\"]+/_/g")"
-  lock_file="$LOCKDIR/$lock_key"
+  local lock_key="$(echo "$input_abs_path" | sed -r "s/[:/ '\"]+/_/g")"
+  local lock_file="$LOCKDIR/$lock_key"
   echo "Locking '$input_rel_path' as $lock_key" >&2
   if ! ( set -o noclobber; true >"$lock_file" ) &>/dev/null; then
     echo "Someone already locked '$input_rel_path'" >&2
     return 0
   fi
-  locked_by_me=true
+  local locked_by_me=true
 
   # Let some values be set in config. Otherwise, figure them out.
-  [ -n "$INTERLACED" ] && CONFIG_INTERLACED="$INTERLACED"
-  [ -n "$CROPPING" ] && CONFIG_CROPPING="$CROPPING"
+  [ -n "$INTERLACED" ] && local CONFIG_INTERLACED="$INTERLACED"
+  [ -n "$CROPPING" ] && local CONFIG_CROPPING="$CROPPING"
 
   if [ -z "$CONFIG_INTERLACED" ] || [ -z "$CONFIG_CROPPING" ]; then
-    analysis_cache_file="$CACHEDIR/analyze/$input_rel_path"
+    local analysis_cache_file="$CACHEDIR/analyze/$input_rel_path"
     if [ -f "$analysis_cache_file" ]; then
       debug "Using cached analysis: $analysis_cache_file"
-      ANALYSIS="$(cat "$analysis_cache_file")"
+      local ANALYSIS="$(cat "$analysis_cache_file")"
     else
       echo "Analyzing $input_rel_path"
       echo " - $(date)"
-      ANALYSIS=$("$TOOLSDIR/analyze.sh" "$input_abs_path" -k "$input_rel_path") || {
+      local ANALYSIS=$("$TOOLSDIR/analyze.sh" "$input_abs_path" -k "$input_rel_path") || {
         warn "Analysis failed on '$input_abs_path'"
         return 1
       }
@@ -414,7 +414,7 @@ function encode_one {
     echo "Detected: $INTERLACED" >&2
     echo "Using configured value" >&2
   }
-  INTERLACED="${CONFIG_INTERLACED:-$INTERLACED}"
+  local INTERLACED="${CONFIG_INTERLACED:-$INTERLACED}"
   [ -n "$CONFIG_CROPPING" ] && [ -n "$CROPPING" ] && [ "$CONFIG_CROPPING" != "$CROPPING" ] && {
     echo "Config cropping value doesn't match detected cropping value." >&2
     echo "Config  : $CONFIG_CROPPING" >&2
@@ -423,7 +423,7 @@ function encode_one {
     # makes the video all crazy stretched out. 710:360:4:60 works fine.
     #return 1
   }
-  CROPPING="${CONFIG_CROPPING:-$CROPPING}"
+  local CROPPING="${CONFIG_CROPPING:-$CROPPING}"
   debug "Interlacing: $INTERLACED"
   [ "$INTERLACED" = progressive ] || [ "$INTERLACED" = interlaced ] || {
     echo "Invalid interlace value: '$INTERLACED'" >&2
@@ -439,7 +439,7 @@ function encode_one {
     return 1
   }
 
-  VQ=$("$TOOLSDIR/quality.sh" "$input_abs_path")
+  local VQ=$("$TOOLSDIR/quality.sh" "$input_abs_path")
   debug "Quality: $VQ"
 
   # Okay, at this point, I think we've gathered all the information
@@ -454,10 +454,10 @@ function encode_one {
   # the same. Hopefully the checksums will, too, but I'm not
   # confident about that, especially across makemkv releases.
 
-  details_file="$DATADIR/details/$input_rel_path"
+  local details_file="$DATADIR/details/$input_rel_path"
   if [ ! -f "$details_file" ]; then
     debug "Gathering title details"
-    input_size=$(du -b "$input_abs_path" | awk '{print $1}')
+    local input_size=$(du -b "$input_abs_path" | awk '{print $1}')
     debug "Size: $input_size"
     debug "Duration: $input_length"
     echo "Recording details to $details_file"
@@ -470,7 +470,7 @@ EOF
 
   # Grab info about the input file streams because I'll (probably) need it in more than one place. I could probably
   # speed things up by sharing this with utility scripts, too.
-  stream_data="$(ffprobe -probesize 100M -i "$input_abs_path" 2>&1 | grep Stream)"
+  local stream_data="$(ffprobe -probesize 100M -i "$input_abs_path" 2>&1 | grep Stream)"
 
   # Listed here for my reference. Should I separate upscale from cleanup? Reportedly deinterlacing happens before
   # upscaling, so I guess I'm okay for now. Reconsider if I find something that should come after upscaling but before
@@ -479,35 +479,35 @@ EOF
   # Make sure widths and heights are divisible by 2 for the yuv420 pixel format (w=-2 and h=-2 ensure this).
 
   # Best denoising for DVDs with slightly gentler unsharpening
-  dvd_upscale_super_slow="zscale=w=-2:h=1080:filter=spline36:dither=error_diffusion,nlmeans=s=4:p=7:pc=0:r=15:rc=0,unsharp=5:5:0.5:5:5:0.25"
+  local dvd_upscale_super_slow="zscale=w=-2:h=1080:filter=spline36:dither=error_diffusion,nlmeans=s=4:p=7:pc=0:r=15:rc=0,unsharp=5:5:0.5:5:5:0.25"
   # Faster denoising with a little more aggressive unsharpening. This is MASSIVELY faster!
-  dvd_upscale_width_quick="zscale=w=1920:h=-2:filter=spline36:dither=error_diffusion,hqdn3d=1.5:1.5:6:6,unsharp=5:5:0.6:5:5:0.3"
-  dvd_upscale_height_quick="zscale=w=-2:h=1080:filter=spline36:dither=error_diffusion,hqdn3d=1.5:1.5:6:6,unsharp=5:5:0.6:5:5:0.3"
+  local dvd_upscale_width_quick="zscale=w=1920:h=-2:filter=spline36:dither=error_diffusion,hqdn3d=1.5:1.5:6:6,unsharp=5:5:0.6:5:5:0.3"
+  local dvd_upscale_height_quick="zscale=w=-2:h=1080:filter=spline36:dither=error_diffusion,hqdn3d=1.5:1.5:6:6,unsharp=5:5:0.6:5:5:0.3"
   # For if I want to upscale bluray to 4k, but this will increase the file size a lot (maybe double)
-  bluray_upscale="zscale=w=-2:h=2160:filter=spline36:dither=error_diffusion,hqdn3d=1.0:1.0:4:4,unsharp=5:5:0.4:5:5:0.2"
+  local bluray_upscale="zscale=w=-2:h=2160:filter=spline36:dither=error_diffusion,hqdn3d=1.0:1.0:4:4,unsharp=5:5:0.4:5:5:0.2"
   # For now, I'm not even considering doing an nlmeans bluray upscale because of how insanely long it'll take.
 
   # I think this is a good place to adjust for the MODE we're in. We've figured out most stuff and are about to use it.
   if [ "$MODE" = FIRST_PASS ]; then
     debug "Tweaking settings for speed for MODE=FIRST_PASS"
     # Force no deinterlacing for speed
-    INTERLACED=progressive
+    local INTERLACED=progressive
     # Keep cropping because in theory, encoding less pixels will be faster
     # x264 is faster than x265
-    encoder=libx264
-    encoder_settings=(-preset:v:0 ultrafast)
+    local encoder=libx264
+    local encoder_settings=(-preset:v:0 ultrafast)
     # For first pass, we're going for small and fast. A higher CRF gives us small.
-    VQ=28
+    local VQ=28
   elif [ "$MODE" = STABLE ]; then
     debug "Relying on discovered settings for MODE=STABLE"
-    encoder=libx265
-    encoder_settings=(-preset:v:0 slow)
+    local encoder=libx265
+    local encoder_settings=(-preset:v:0 slow)
     # 10-bit is recommended for good color gradients
     # Setting pools manually to support docker containers where ffmpeg can't always detect the number of cores
     encoder_settings+=(-pix_fmt yuv420p10le -x265-params "pools=$(nproc)")
 
     # To upscale correctly, we need to know about the incoming video size.
-    video_stream="$(echo "$stream_data" | grep 'Stream #0:0')"
+    local video_stream="$(echo "$stream_data" | grep 'Stream #0:0')"
     [ -n "$video_stream" ] || {
       warn "Didn't find video stream in stream data"
       return 1
@@ -517,15 +517,15 @@ EOF
     # And this is what DVDs look like
     # regex='Stream #0:0.*Video:.*, ([0-9]*)x([0-9]*) \[.*\], SAR [0-9:]* DAR [0-9:]*, ([0-9.]*) fps, ([0-9.]*) tbr,.*$'
     # This handles both
-    regex='Stream #0:0.*Video:.*, ([0-9]*)x([0-9]*) \[.*\].*, ([0-9.]*) fps, ([0-9.]*) tbr,.*$'
+    local regex='Stream #0:0.*Video:.*, ([0-9]*)x([0-9]*) \[.*\].*, ([0-9.]*) fps, ([0-9.]*) tbr,.*$'
     if [[ "$CROPPING" =~ ^([0-9]*):([0-9]*):[0-9]*:[0-9]*$ ]]; then
       # If we're cropping the video, this is the size we need to look at, but cropping could be "none"
-      width="${BASH_REMATCH[1]}"
-      height="${BASH_REMATCH[2]}"
+      local width="${BASH_REMATCH[1]}"
+      local height="${BASH_REMATCH[2]}"
     elif [[ "$video_stream" =~ $regex ]]; then
       # If not cropping, then use the size of the incoming video
-      width="${BASH_REMATCH[1]}"
-      height="${BASH_REMATCH[2]}"
+      local width="${BASH_REMATCH[1]}"
+      local height="${BASH_REMATCH[2]}"
     else
       warn "Couldn't determine input height and width"
       return 1
@@ -541,14 +541,14 @@ EOF
     if [ "$width" -lt 1000 ]; then
       # Nearly half the width of 1080p (1920x1080), so let's upscale.
       debug "Upscaling DVD content"
-      target_ratio="$(echo "1920/1080" | bc -l)"
-      actual_ratio="$(echo "$width/$height" | bc -l)"
+      local target_ratio="$(echo "1920/1080" | bc -l)"
+      local actual_ratio="$(echo "$width/$height" | bc -l)"
       if [ "$(echo "$actual_ratio > $target_ratio" | bc -l)" = 1 ]; then
         # Width dominates actual ratio, so scale to width
-       upscale_filters="$dvd_upscale_width_quick"
+        local upscale_filters="$dvd_upscale_width_quick"
       else
         # Height dominates actual ratio
-       upscale_filters="$dvd_upscale_height_quick"
+        local upscale_filters="$dvd_upscale_height_quick"
       fi
     fi
   else
@@ -567,25 +567,25 @@ EOF
       warn "Can't use cuts with splits until I rewrite this!"
       return 1
     }
-    concat_cache_file="$CACHEDIR/concat/$input_rel_path"
-    FILTERCMD=("$script_dir/filter.sh" "$input_abs_path" -c "$concat_cache_file")
-    EXTRAS=()
+    local concat_cache_file="$CACHEDIR/concat/$input_rel_path"
+    local FILTERCMD=("$script_dir/filter.sh" "$input_abs_path" -c "$concat_cache_file")
+    local EXTRAS=()
     [ "$INTERLACED" = "interlaced" ] && EXTRAS+=("bwdif=mode=1")
     [ "$CROPPING" = none ] || EXTRAS+=("crop=$CROPPING")
     [ "${#EXTRAS[@]}" -gt 0 ] && FILTERCMD+=(-v "$(IFS=,; printf "%s" "${EXTRAS[*]}")")
     mkdir -p "$(dirname "$concat_cache_file")"
-    printable=""
+    local printable=""
     for x in "${FILTERCMD[@]}"; do
       printable+="'$x' "
     done
     debug "Calculate filter args with: $printable"
-    COMPLEXFILTER=$("${FILTERCMD[@]}") || {
+    local COMPLEXFILTER=$("${FILTERCMD[@]}") || {
       echo "filter.sh failed to determine complex filter string" >&2
       return 1
     }
     debug "complex_filter: $COMPLEXFILTER"
   else
-    VFILTERS=()
+    local VFILTERS=()
     [ "$INTERLACED" = interlaced ] && VFILTERS+=("bwdif=mode=1")
     [ "$CROPPING" = none ] || VFILTERS+=("crop=$CROPPING")
     # Upscale *after* deinterlacing, per Claude!
@@ -595,16 +595,16 @@ EOF
     echo "KEEP_STREAMS should be known by now" >&2
     return 1
   }
-  MAPS=""
-  encodings=()
+  local MAPS=""
+  local encodings=()
   if [ -n "$COMPLEXFILTER" ]; then
     debug "have complex filter; mapping this way"
-    s_idx=0
+    local s_idx=0
     read -ra ALLOUTS <<<"$OUTSTRING"
     while read -r line; do
       if [[ "$line" =~ Stream\ #(.:.+)\([^\)]*\):\ (Video|Audio|Subtitle): ]]; then
-        stream="${BASH_REMATCH[1]}"
-        stream_type="${BASH_REMATCH[2]}"
+        local stream="${BASH_REMATCH[1]}"
+        local stream_type="${BASH_REMATCH[2]}"
         case "$stream_type" in
           Video)
             debug "Map stream $stream as video"
@@ -634,7 +634,7 @@ EOF
       fi
       s_idx=$((s_idx+1))
     done <<<"$stream_data"
-#    	NMAPS="${#CUT_STREAMS[@]}"
+#    	local NMAPS="${#CUT_STREAMS[@]}"
 #    	NMAPS=$((NMAPS-1))
 #    	for I in $(seq 0 $NMAPS); do
 #    	    MAPS="$MAPS -map ${ALLOUTS[$I]}"
@@ -645,21 +645,21 @@ EOF
     if [ "$KEEP_STREAMS" = all ]; then
       # When a rip has a weird stream that's not really a stream, it seems to break ffmpeg's time and speed estimates.
       # only include true video, audio, and subtitle (if present) streams.
-      MAPS="-map 0:V -map 0:a -map 0:s?"
+      local MAPS="-map 0:V -map 0:a -map 0:s?"
     else
       for S in "${KEEP_STREAMS[@]}"; do
-        MAPS="$MAPS -map $S"
+        local MAPS="$MAPS -map $S"
       done
     fi
   fi
   [ -n "$TRANSCODE_AUDIO" ] && {
-    MAPS="${MAPS# -map 0:0}"
+    local MAPS="${MAPS# -map 0:0}"
     MAPS="-map 0:0 -map $TRANSCODE_AUDIO $MAPS"
   }
   debug "MAPS: $MAPS"
 
-  VFILTERSTRING="${VFILTERS[0]}"
-  i=1
+  local VFILTERSTRING="${VFILTERS[0]}"
+  local i=1
   while [ $i -lt "${#VFILTERS[@]}" ]; do
     VFILTERSTRING="$VFILTERSTRING,${VFILTERS[$i]}"
     i=$((i+1))
@@ -679,20 +679,20 @@ EOF
   # options, etc.
   for i in "${!output_abs_paths[@]}"; do
     debug "Output $i"
-    output_tmp_path="${output_tmp_paths[i]}"
-    output_abs_path="${output_abs_paths[i]}"
-    done_file="${done_files[i]}"
+    local output_tmp_path="${output_tmp_paths[i]}"
+    local output_abs_path="${output_abs_paths[i]}"
+    local done_file="${done_files[i]}"
     echo "Processing $input_rel_path into $output_abs_path" >&2
     # On the first output, naturally start from the beginning of the input. On subsequent outputs, start from the split
     # time.
     if [ "$i" -gt 0 ]; then
       output_args+=(-ss "${split_times[i]}")
-      next="${split_times[i+1]}"
+      local next="${split_times[i+1]}"
     fi
     # Likewise, include the "to" time on all but the last output, allowing encoding to naturally end at the end of the
     # input.
     if [ "$i" -lt "${#output_abs_paths[@]}" ]; then
-      to_time="${split_times[i+1]}"
+      local to_time="${split_times[i+1]}"
       if [ -n "$to_time" ]; then
         output_args+=(-to "$to_time")
       fi
@@ -750,11 +750,11 @@ EOF
 
   # Always display the movie length because I use that to gauge
   # progress when watching the logs.
-  input_length=$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=DURATION-eng -of default=noprint_wrappers=1:nokey=1 "$input_abs_path" | cut -d '.' -f 1)
+  local input_length=$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=DURATION-eng -of default=noprint_wrappers=1:nokey=1 "$input_abs_path" | cut -d '.' -f 1)
   echo "  duration: $input_length"
 
   # Use locally installed ffmpeg, or a docker container?
-  CMD=(ffmpeg)
+  local CMD=(ffmpeg)
   #CMD=(docker run --rm -v "$TOOLSDIR":"$TOOLSDIR" -v "$MOVIESDIR":"$MOVIESDIR" -w "$(pwd)" jrottenberg/ffmpeg -stats)
 
   # Running in docker lately, I've noticed it seems stuck at two cores max. Gemini suggests ffmpeg itself may be to
@@ -772,7 +772,7 @@ EOF
   fi
 
   CMD+=("${output_args[@]}")
-  LOGFILE="$LOGDIR/$input_rel_path.log"
+  local LOGFILE="$LOGDIR/$input_rel_path.log"
 
   echo -n "  "
   for arg in "${CMD[@]}"; do
@@ -793,7 +793,7 @@ EOF
     echo "  start: $(date)"
     ln -fs "$LOGFILE" currentlog
     "${CMD[@]}" &> "$LOGFILE"
-    encode_result="$?"
+    local encode_result="$?"
     echo "  end  : $(date)"
   fi
 
@@ -804,9 +804,9 @@ EOF
   elif [ "$encode_result" -eq 0 ]; then
     echo "Marking file as done done."
     for i in "${!output_abs_paths[@]}"; do
-      output_tmp_path="${output_tmp_paths[i]}"
-      output_abs_path="${output_abs_paths[i]}"
-      done_file="${done_files[i]}"
+      local output_tmp_path="${output_tmp_paths[i]}"
+      local output_abs_path="${output_abs_paths[i]}"
+      local done_file="${done_files[i]}"
       if [ -z "$output_tmp_path" ] || [ -z "$output_abs_path" ] || [ -z "$done_file" ]; then
         warn "Something went horribly wrong: tmp='$output_tmp_path' abs='$output_abs_path' done='$done_file'"
         return 1
