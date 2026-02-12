@@ -4,8 +4,6 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 export script_dir
 
 source "$script_dir/config"
-# Directory to scan for raw mkv's ripped from disc
-export INPUTDIR
 
 source "$script_dir/utils"
 export -f die
@@ -50,7 +48,6 @@ export -f debug
 [ -d "$DATADIR" ] || die "DATADIR doesn't exist: $DATADIR"
 [ -d "$LOCKDIR" ] || die "LOCKDIR doesn't exist: $LOCKDIR"
 [ -d "$CONFIGDIR" ] || die "CONFIGDIR doesn't exist: $CONFIGDIR"
-[ -d "$INPUTDIR" ] || die "INPUTDIR doesn't exist: $INPUTDIR"
 [ -d "$MOVIESDIR" ] || die "MOVIESDIR doesn't exist: $MOVIESDIR"
 [ -d "$TVSHOWSDIR" ] || die "TVSHOWSDIR doesn't exist: $TVSHOWSDIR"
 [ -d "$TOOLSDIR" ] || die "TOOLSDIR doesn't exist: $TOOLSDIR"
@@ -110,9 +107,13 @@ function cleanup {
 export -f cleanup
 
 function encode_one {
-  [ -f "$1" ] || {
-    echo "File doesn't exist: '$1'" 2>&1
-    exit 1
+  input_dir="$1"
+  input_rel_path="$2"
+  # Absolute path to the input file
+  input_abs_path="$(realpath "$input_dir/$input_rel_path")"
+  [ -f "$input_abs_path" ] || {
+    echo "File doesn't exist: '$input_abs_path'" 2>&1
+    return 1
   }
   set -e
 
@@ -125,9 +126,6 @@ function encode_one {
     done
   fi
 
-  # Absolute path to the input file
-  input_abs_path="$(realpath "$1")"
-
   # Verify pixel format because I have to specify it for GPU encoding, and I'm not certain what happens if you change it.
   in_pix_fmt="$(ffprobe -v error -select_streams v:0 -show_entries stream=pix_fmt -of default=noprint_wrappers=1:nokey=1 "$input_abs_path")"
   if [ -n "$USE_GPU" ] && [ -z "$NEVER_GPU" ]; then
@@ -137,22 +135,6 @@ function encode_one {
       exit 1
     }
   fi
-
-  # Now we have to figure out what config file to look for. The
-  # input could be either a movie or a tv show. A movie file might
-  # be:
-  #
-  # /media/blah/ripping/media-in/MenInBlack/title01.mkv
-  #
-  # A tv show would be more like:
-  #
-  # /media/blah/ripping/media-in/MASH/Season 4/Disk 2/title01.mkv
-  #
-  # In either case, removing the input dir from the front of the
-  # file name gives us a path we can use to map to a config file. In
-  # other words, the config file name matches the relative path to
-  # the input file.
-  input_rel_path="${input_abs_path#$INPUTDIR/}"
 
   # Now load the config file so that we can refer to the information
   # in it as needed. A config file is required for every input file
@@ -827,7 +809,8 @@ check_for_stop() {
 export -f check_for_stop
 
 filter_input() {
-  input_path="$1"
+  input_dir="$1"
+  input_path="$2"
   if [ -z "$FILTER_INPUT" ] || echo "$input_path" | grep -Ei "$FILTER_INPUT" &>/dev/null; then
     encode_one "$@"
   else
@@ -838,5 +821,4 @@ export -f filter_input
 
 [ $# -eq 1 ] && ONE=true
 [ "$ONE" = true ] && handle_input_file "$1"
-[ -z "$ONE" ] && "$script_dir/ls-inputs.sh" -sz | xargs -0I {} bash -c 'handle_input_file "{}" || exit 255'
-
+[ -z "$ONE" ] && "$script_dir/ls-inputs.sh" -sz | xargs -0I {} bash -c 'IFS="|" read -ra input_fields <<<"{}"; handle_input "${input_fields[@]}" || exit 255'
