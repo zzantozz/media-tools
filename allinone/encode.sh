@@ -65,13 +65,20 @@ mkdir -p "$LOGDIR"
 OUTSTRING="[outa] [outb] [outc] [outd] [oute] [outf] [outg] [outh] [outi] [outj] [outkl] [outm] [outn] [outo] [outp] [outq]"
 export OUTSTRING
 
-# If DRYRUN is set, export it so the function sees it
+# Export additional vars if present
 [ -n "$DRYRUN" ] && export DRYRUN
+[ -n "$ALT_OUTPUT_DIRS" ] && export ALT_OUTPUT_DIRS
+[ -n "$USE_GPU" ] && export USE_GPU
+[ -n "$NEVER_GPU" ] && export NEVER_GPU
 
 debug "Running from $script_dir"
 
 function cleanup {
-  if [ -f "$lock_file" ] && [ "$locked_by_me" = true ]; then
+  echo "Cleanup input: '$1'"
+  IFS='|' read -r -a args <<<"$1"
+  lock_file="${args[0]}"
+  output_tmp_paths=("${args[@]:1}")
+  if [ -f "$lock_file" ]; then
     echo "Clean up lock file: '$lock_file'"
     rm -f "$lock_file"
   fi
@@ -107,8 +114,10 @@ function cleanup {
 export -f cleanup
 
 function encode_one {
-  input_dir="$1"
-  input_rel_path="$2"
+  readarray -d '' args
+  input_dir="${args[0]}"
+  input_rel_path="${args[1]}"
+  [ -d "$input_dir" ] || die "Input dir doesn't exist: '$input_dir'"
   # Absolute path to the input file
   input_abs_path="$(realpath "$input_dir/$input_rel_path")"
   [ -f "$input_abs_path" ] || {
@@ -126,9 +135,9 @@ function encode_one {
     done
   fi
 
-  # Verify pixel format because I have to specify it for GPU encoding, and I'm not certain what happens if you change it.
-  in_pix_fmt="$(ffprobe -v error -select_streams v:0 -show_entries stream=pix_fmt -of default=noprint_wrappers=1:nokey=1 "$input_abs_path")"
   if [ -n "$USE_GPU" ] && [ -z "$NEVER_GPU" ]; then
+    # Verify pixel format because I have to specify it for GPU encoding, and I'm not certain what happens if you change it.
+    in_pix_fmt="$(ffprobe -v error -select_streams v:0 -show_entries stream=pix_fmt -of default=noprint_wrappers=1:nokey=1 "$input_abs_path")"
     [ "$in_pix_fmt" = "yuv420p" ] || {
       echo "Only handling pixel format yuv42p. Input has format '$in_pix_fmt'" >&2
       echo " - path: $input_abs_path" >&2
@@ -372,7 +381,7 @@ function encode_one {
     echo "Someone already locked '$input_rel_path'" >&2
     return 0
   fi
-  locked_by_me=true
+  trap "cleanup '$lock_file|'" EXIT
 
   # Let some values be set in config. Otherwise, figure them out.
   [ -n "$INTERLACED" ] && CONFIG_INTERLACED="$INTERLACED"
@@ -717,7 +726,11 @@ EOF
   # Just to be safe, unset the temp vars that were used above so that we don't confuse them with anything later on.
   unset output_abs_path output_tmp_path formatted_output_rel_path done_file already_done
 
-  trap cleanup EXIT
+  cleanup_files="$lock_file"
+  for f in "${output_tmp_paths[@]}"; do
+    cleanup_files="$cleanup_files|$f"
+  done
+  trap "cleanup '$cleanup_files'" EXIT
 
   # Always display the movie length because I use that to gauge
   # progress when watching the logs.
@@ -804,7 +817,6 @@ export -f encode_one
 handle_input() {
   check_for_stop "$@"
 }
-export -f handle_input
 
 check_for_stop() {
   if [ -f "$script_dir/stop" ]; then
@@ -814,7 +826,18 @@ check_for_stop() {
     filter_input "$@"
   fi
 }
-export -f check_for_stop
+
+# Complicated traps necessary here for running in docker. Since I run the encode_one function as a subprocess, the
+# parent has to ensure the TERM signal is propagated to the child. To do that, apparently the parent has to trap the
+# signal and send it to the child explicitly. So:
+# 1. fork the child process in the background
+# 2. store the child pid
+# 3. set a trap for the parent process, which sends TERM to the child and waits for it to stop
+# 4. wait on the child to exit normally
+term_child() {
+  kill "$child_pid"
+  wait "$child_pid"
+}
 
 filter_input() {
   input_dir="$1"
@@ -822,12 +845,14 @@ filter_input() {
   if [ -z "$FILTER_INPUT" ] || echo "$input_path" | grep -Ei "$FILTER_INPUT" &>/dev/null; then
     # New shell to put the encoding function in an isolated environment. It has way too many variables to control, and
     # they between invocations!
-    bash -c "encode_one '$input_dir' '$input_path'"
+    printf "%s\0%s" "$input_dir" "$input_path" | bash -c encode_one &
+    child_pid=$!
+    trap term_child EXIT
+    wait "$child_pid"
   else
     debug "Filtered out '$input_path'"
   fi
 }
-export -f filter_input
 
 ls_opts_raw="${LS_OPTS:--s}"
 read -ra ls_opts <<<"$ls_opts_raw"
