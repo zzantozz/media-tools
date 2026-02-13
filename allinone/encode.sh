@@ -726,6 +726,12 @@ EOF
 
   # Use locally installed ffmpeg, or a docker container?
   CMD=(ffmpeg)
+  # When I switched from using xargs to running in a loop, I started seeing these in the logs:
+  # Enter command: <target>|all <time>|-1 <command>[ <argument>]
+  # A quick search brought up a stackoverflow with someone doing exactly what I'm doing: running ffmpeg in a loop from
+  # find results to transcode for plex! The problem appears to be that ffmpeg is getting some input from stdin for some
+  # reason. Why is unknown, but this flag prevents it from reading anything there.
+  CMD+=(-nostdin)
   #CMD=(docker run --rm -v "$TOOLSDIR":"$TOOLSDIR" -v "$MOVIESDIR":"$MOVIESDIR" -w "$(pwd)" jrottenberg/ffmpeg -stats)
 
   # Running in docker lately, I've noticed it seems stuck at two cores max. Gemini suggests ffmpeg itself may be to
