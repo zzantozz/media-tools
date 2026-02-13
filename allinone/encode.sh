@@ -488,7 +488,7 @@ EOF
   elif [ "$MODE" = STABLE ]; then
     debug "Relying on discovered settings for MODE=STABLE"
     encoder=libx265
-    encoder_settings=(-preset:v:0 slow)
+    encoder_settings=(-preset:v:0 medium)
     # 10-bit is recommended for good color gradients
     # Setting pools manually to support docker containers where ffmpeg can't always detect the number of cores
     encoder_settings+=(-pix_fmt yuv420p10le -x265-params "pools=$(nproc)")
