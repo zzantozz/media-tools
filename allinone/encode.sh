@@ -820,7 +820,9 @@ filter_input() {
   input_dir="$1"
   input_path="$2"
   if [ -z "$FILTER_INPUT" ] || echo "$input_path" | grep -Ei "$FILTER_INPUT" &>/dev/null; then
-    encode_one "$@"
+    # New shell to put the encoding function in an isolated environment. It has way too many variables to control, and
+    # they between invocations!
+    bash -c "encode_one '$input_dir' '$input_path'"
   else
     debug "Filtered out '$input_path'"
   fi
@@ -829,4 +831,7 @@ export -f filter_input
 
 ls_opts_raw="${LS_OPTS:--s}"
 read -ra ls_opts <<<"$ls_opts_raw"
-"$script_dir/ls-inputs.sh" "${ls_opts[@]}" | xargs -0I {} bash -c 'IFS="|" read -ra input_fields <<<"{}"; handle_input "${input_fields[@]}" || exit 255'
+while read -r input_line; do
+  IFS="|" read -ra input_fields <<<"$input_line"
+  handle_input "${input_fields[@]}"
+done <<<"$("$script_dir/ls-inputs.sh" "${ls_opts[@]}")"
