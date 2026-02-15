@@ -767,6 +767,9 @@ EOF
     [ -n "$COMPLEXFILTER" ] && {
       CMD+=("${encodings[@]}")
     }
+    # Suggested by Gemini to handle edge cases where cutting video might result in negative timestamps from weird
+    # bluray lead-in buffers or something. It claims it can't hurt anything and is a good safety net.
+    CMD+=(-avoid_negative_ts make_zero)
     CMD+=(-metadata:s:0 "encoded_by=My smart encoder script")
     if [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ]; then
       CMD+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
