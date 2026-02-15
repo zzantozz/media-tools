@@ -741,7 +741,11 @@ EOF
     fi
     # I probably should make this an array. I'd just have to convert a whole lot of configs.
     read -ra extra_opts options_arr <<<"$FFMPEG_EXTRA_OPTIONS"
-    output_args+=("${extra_opts[@]}" -f matroska "$output_tmp_path")
+    output_args+=("${extra_opts[@]}" -f matroska)
+    # STOP MARKING SUBTITLE STREAM 0 AS THE DEFAULT!
+    output_args+=(-default_mode infer_no_subs)
+    # And finally, where to write the output
+    output_args+=("$output_tmp_path")
     debug "Created outputs for: '$output_tmp_path'"
     debug "  outputs: '${output_args[*]}'"
   done
