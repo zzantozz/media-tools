@@ -81,43 +81,16 @@ export OUTSTRING
 debug "Running from $script_dir"
 
 function cleanup {
-  echo "Cleanup input: '$1'"
   IFS='|' read -r -a args <<<"$1"
   lock_file="${args[0]}"
-  output_tmp_paths=("${args[@]:1}")
+  output_tmp_path=("${args[1]}")
   if [ -f "$lock_file" ]; then
     echo "Clean up lock file: '$lock_file'"
     rm -f "$lock_file"
   fi
-  # TODO: simplify; this will no longer get multiple tmp_output_paths because each output is
-  # handled one at a time
-  if [ -n "${output_tmp_paths[*]}" ]; then
-    for i in "${!output_tmp_paths[@]}"; do
-      status=clean_it
-      tmp_output="${output_tmp_paths[i]}"
-      if [ -f "$tmp_output" ]; then
-        echo "Checking if we should should keep or clean up '$tmp_output'"
-        j=$((i+1))
-        next_tmp_output="${output_tmp_paths[j]}"
-        if [ -n "$next_tmp_output" ] && [ -f "$next_tmp_output" ]; then
-          size="$(cat "$next_tmp_output" | wc -c)"
-          # Check for non-trivial size. In practice, non-started files seem to end up about 5k?
-          if [ "$size" -gt 102400 ]; then
-            # The current one must have finished because the next one was at least started
-            status=keep_it
-          fi
-        fi
-        if [ "$status" = keep_it ]; then
-          abs_output="${output_abs_paths[i]}"
-          done_file="${done_files[i]}"
-          echo "It's done! Keep it!"
-          mv "$tmp_output" "$abs_output" && touch "$done_file"
-        else
-          echo "Doesn't look done. Trash it!"
-          rm -f "$tmp_output"
-        fi
-      fi
-    done
+  if [ -f "$output_tmp_path" ]; then
+    echo "Clean up tmp file: '$output_tmp_path'"
+    rm -f "$output_tmp_path"
   fi
 }
 export -f cleanup
@@ -860,13 +833,13 @@ check_for_stop() {
 
 # Complicated traps necessary here for running in docker. Since I run the encode_one function as a subprocess, the
 # parent has to ensure the TERM signal is propagated to the child. To do that, apparently the parent has to trap the
-# signal and send it to the child explicitly. So:
+# signal and send it along explicitly. I want the whole process tree dead, so:
 # 1. fork the child process in the background
 # 2. store the child pid
-# 3. set a trap for the parent process, which sends TERM to the child and waits for it to stop
+# 3. set a trap for the parent process, which sends TERM to the process group and waits for the child to stop
 # 4. wait on the child to exit normally
 term_child() {
-  kill "$child_pid" || true
+  kill -- "-$$" || true
   wait "$child_pid" || true
 }
 
@@ -876,7 +849,7 @@ filter_input() {
   if [ -z "$FILTER_INPUT" ] || echo "$input_path" | grep -Ei "$FILTER_INPUT" &>/dev/null; then
     # New shell to put the encoding function in an isolated environment. It has way too many variables to control, and
     # they between invocations!
-    printf "%s\0%s" "$input_dir" "$input_path" | bash -c encode_one || true &
+    printf "%s\0%s" "$input_dir" "$input_path" | bash -c encode_one &
     child_pid=$!
     trap term_child EXIT
     wait "$child_pid"
