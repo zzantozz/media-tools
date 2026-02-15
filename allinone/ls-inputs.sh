@@ -15,7 +15,7 @@ else
 fi
 
 for dir in "${input_dirs[@]}"; do
-  [ -d "$dir" ] || die "Input dir doesn't exist: '$input_dir'"
+  [ -d "$dir" ] || die "ls input dir doesn't exist: '$dir'"
 done
 
 usage() {
