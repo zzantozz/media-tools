@@ -864,8 +864,8 @@ check_for_stop() {
 # 3. set a trap for the parent process, which sends TERM to the child and waits for it to stop
 # 4. wait on the child to exit normally
 term_child() {
-  kill "$child_pid"
-  wait "$child_pid"
+  kill "$child_pid" || true
+  wait "$child_pid" || true
 }
 
 filter_input() {
@@ -874,7 +874,7 @@ filter_input() {
   if [ -z "$FILTER_INPUT" ] || echo "$input_path" | grep -Ei "$FILTER_INPUT" &>/dev/null; then
     # New shell to put the encoding function in an isolated environment. It has way too many variables to control, and
     # they between invocations!
-    printf "%s\0%s" "$input_dir" "$input_path" | bash -c encode_one &
+    printf "%s\0%s" "$input_dir" "$input_path" | bash -c encode_one || true &
     child_pid=$!
     trap term_child EXIT
     wait "$child_pid"
