@@ -38,7 +38,8 @@ services:
       - LS_OPTS=${LS_OPTS:-}
       - TVSHOWSDIR=/mnt/encode-target/tv-shows
       - MOVIESDIR=/mnt/encode-target/movies
-      - INPUTDIR=${INPUTDIR:-/mnt/j/ripping}
+      - WORKDIR=/mnt/encode-target/work
+      - INPUT_DIRS=${INPUT_DIRS:-/mnt/j/ripping:/mnt/k/ripping:/mnt/l/ripping}
       - CACHEDIR=/mnt/d/ripping-work/cache
       - MODE=${MODE:-}
 #      - ALT_OUTPUT_DIRS=/mnt/tmp1/plex-media-server/encoded/movies:/mnt/tmp1/plex-media-server/encoded/tv-shows:/mnt/tmp2/plex-media-server/encoded/movies:/mnt/tmp2/plex-media-server/encoded/tv-shows

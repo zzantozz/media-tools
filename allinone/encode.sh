@@ -37,6 +37,12 @@ export TVSHOWSDIR
 # Directory holding general ripping tools
 TOOLSDIR=${TOOLSDIR:-"$script_dir/.."}
 export TOOLSDIR
+# Directory to write encoding output to. I always used to write to the final output dir, but then I noticed that plex
+# is constantly noticing the updates to the files, so it might be a little better to write to a temporary location and
+# then move them when finished. It has to be on the same drive, though! Default to empty string to make this optional
+# so that I can experiment with it to begin with.
+WORKDIR="${WORKDIR:-}"
+export WORKDIR
 
 function debug {
   [[ "$DEBUG" =~ "encode" ]] && echo -e "$1" 1>&2
@@ -51,6 +57,7 @@ export -f debug
 [ -d "$MOVIESDIR" ] || die "MOVIESDIR doesn't exist: $MOVIESDIR"
 [ -d "$TVSHOWSDIR" ] || die "TVSHOWSDIR doesn't exist: $TVSHOWSDIR"
 [ -d "$TOOLSDIR" ] || die "TOOLSDIR doesn't exist: $TOOLSDIR"
+[ -z "$WORKDIR" ] || [ -d "$WORKDIR" ] || die "WORKDIR doesn't exist: $WORKDIR"
 
 if ! [ "$MODE" = FIRST_PASS ] && ! [ "$MODE" = STABLE ] && ! [ "$MODE" = POLISHED ]; then
   die "You have to set a MODE. There's no default yet. Choose one of: FIRST_PASS | STABLE | POLISHED.\n \
@@ -327,7 +334,18 @@ function encode_one {
     fi
 
     output_abs_path="$base_output_dir/$formatted_output_rel_path"
-    output_tmp_path="$base_output_dir/$(dirname "$formatted_output_rel_path")/$(basename "$formatted_output_rel_path").part"
+    if [ -n "$WORKDIR" ]; then
+      # Write temporary output to a separate work dir instead of to the final output dir. This prevents plex from
+      # constantly noticing updates in its media dirs.
+      tmp_file_name="$(echo "$formatted_output_rel_path" | sed -r "s/[:/ '\"]+/_/g")"
+      # Add a unique number to each temp file, just to help distinguish and identify them. There *should* never be
+      # conflicts, but if input locking gets messed up, then there could be.
+      unique_id="$(shuf -i 1-99999999 -n 1)"
+      # Only keeping the .part because it's how I've named these for so long
+      output_tmp_path="$WORKDIR/$tmp_file_name.$unique_id.part"
+    else
+      output_tmp_path="$output_abs_path.part"
+    fi
 
     done_file="$DONEDIR/$MODE/$formatted_output_rel_path"
     already_done=false
