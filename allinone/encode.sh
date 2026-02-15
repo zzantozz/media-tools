@@ -803,6 +803,7 @@ EOF
       echo "  -- dry run requested, not running"
     else
       echo "  start: $(date)"
+      ln -fs "$LOGFILE" "$script_dir/currentlog"
       ln -fs "$LOGFILE" currentlog
       "${CMD[@]}" &> "$LOGFILE"
       encode_result="$?"
