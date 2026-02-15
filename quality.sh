@@ -13,10 +13,10 @@ if [[ "$DEBUG" =~ quality ]]; then
   echo "$DATA" >&2
 fi
 
-[[ $DATA =~ 720x480 ]] && Q=24
-[[ $DATA =~ 1280x720 ]] && Q=24
-[[ $DATA =~ 1918x1080 ]] && Q=22
-[[ $DATA =~ 1920x1080 ]] && Q=22
+[[ $DATA =~ 720x480 ]] && Q=22
+[[ $DATA =~ 1280x720 ]] && Q=22
+[[ $DATA =~ 1918x1080 ]] && Q=20
+[[ $DATA =~ 1920x1080 ]] && Q=20
 [[ $DATA =~ 3840x2160 ]] && Q=20
 [ -z "$Q" ] && {
 	echo "Can't figure out what video quality to use." >&2
