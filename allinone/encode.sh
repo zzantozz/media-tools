@@ -706,7 +706,7 @@ EOF
     # ffmpeg will tell you what you did wrong.
     [ -z "$COMPLEXFILTER" ] || output_args+=(-filter_complex "$COMPLEXFILTER")
     read -ra maps_array <<<"$MAPS"
-    output_args+=("${maps_array[@]}" -c copy)
+    output_args+=("${maps_array[@]}")
     if [ -n "$VFILTERSTRING" ]; then
       if [ -n "$USE_GPU" ]; then
         output_args+=("-filter:v:0" "hwdownload,format=nv12,$VFILTERSTRING,hwupload_cuda")
@@ -726,6 +726,7 @@ EOF
         output_args+=(-c:0 "$encoder" "${encoder_settings[@]}" -crf:0 "$VQ")
       fi
     fi
+    output_args+=(-c:a copy -c:s copy)
     if [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ]; then
       output_args+=(-c:1 ac3 -ac:1 6 -b:1 384k)
     fi
