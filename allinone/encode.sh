@@ -360,6 +360,11 @@ function encode_one {
     fi
   done
 
+  if ! echo "${done_states[@]}" | grep false >/dev/null; then
+    debug "All outputs already done"
+    return 0
+  fi
+
   debug "Splitting into ${#output_abs_paths[@]} outputs"
 
   if [ -n "$ONLY_MAP" ]; then
