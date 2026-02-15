@@ -322,6 +322,7 @@ function encode_one {
   output_tmp_paths=()
   output_abs_paths=()
   done_files=()
+  done_states=()
   # First loop to determine outputs. It's this complicated to support splitting one input into multiple outputs (looking
   # at you, Chuck bluray Season 2!!). This only reads config data, figures out if we're splitting, and then determines
   # which of the outputs, if any, are already done. It stores everything else in the above variables so that a later
@@ -372,12 +373,14 @@ function encode_one {
 
     if [ "$already_done" = true ] && [ -z "$FORCE" ]; then
       echo "Done: $input_rel_path -> $output_abs_path" >&2
-      continue
+      done_states+=(true)
     else
-      output_tmp_paths+=("$output_tmp_path")
-      output_abs_paths+=("$output_abs_path")
-      done_files+=("$done_file")
+      done_states+=(false)
     fi
+
+    output_tmp_paths+=("$output_tmp_path")
+    output_abs_paths+=("$output_abs_path")
+    done_files+=("$done_file")
 
     if [ -n "$ONLY_MAP" ]; then
       echo "IN: $input_abs_path OUT: $output_abs_path"
@@ -689,6 +692,16 @@ EOF
     output_tmp_path="${output_tmp_paths[i]}"
     output_abs_path="${output_abs_paths[i]}"
     done_file="${done_files[i]}"
+    done_state="${done_states[i]}"
+
+    if [ "$done_state" = true ]; then
+      # This is a hacky way to keep the output array aligned with the split times. I'm sure there's a cleaner way to
+      # manage this, but when I first started running ffmpeg once for each output, I initially introduced a bug where
+      # if some of the outputs were done, the remaning outputs got the wrong split times because the indexes were off.
+      # This is only here to fix that.
+      debug "  skip output - already done"
+      continue
+    fi
 
     # Reset trap for this output. The last one is finished by now.
     cleanup_files="$lock_file|$output_tmp_path"
