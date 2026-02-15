@@ -89,6 +89,8 @@ function cleanup {
     echo "Clean up lock file: '$lock_file'"
     rm -f "$lock_file"
   fi
+  # TODO: simplify; this will no longer get multiple tmp_output_paths because each output is
+  # handled one at a time
   if [ -n "${output_tmp_paths[*]}" ]; then
     for i in "${!output_tmp_paths[@]}"; do
       status=clean_it
@@ -317,7 +319,6 @@ function encode_one {
     base_output_dir="$TOOLSDIR"
   }
 
-  output_args=()
   output_tmp_paths=()
   output_abs_paths=()
   done_files=()
@@ -371,7 +372,7 @@ function encode_one {
 
     if [ "$already_done" = true ] && [ -z "$FORCE" ]; then
       echo "Done: $input_rel_path -> $output_abs_path" >&2
-      return 0
+      continue
     else
       output_tmp_paths+=("$output_tmp_path")
       output_abs_paths+=("$output_abs_path")
@@ -675,6 +676,11 @@ EOF
     exit 1
   fi
 
+  # Always display the movie length because I use that to gauge
+  # progress when watching the logs.
+  input_length=$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=DURATION-eng -of default=noprint_wrappers=1:nokey=1 "$input_abs_path" | cut -d '.' -f 1)
+  echo "  duration: $input_length"
+
   # Second loop to actually process the discovered outputs. This builds the output part of the ffmpeg command by putting
   # together everything we've gathered so far, like the video filters, the one or more output files, any extra ffmpeg
   # options, etc.
@@ -683,162 +689,141 @@ EOF
     output_tmp_path="${output_tmp_paths[i]}"
     output_abs_path="${output_abs_paths[i]}"
     done_file="${done_files[i]}"
+
+    # Reset trap for this output. The last one is finished by now.
+    cleanup_files="$lock_file|$output_tmp_path"
+    trap "cleanup '$cleanup_files'" EXIT
+
     echo "Processing $input_rel_path into $output_abs_path" >&2
+
+    CMD=(ffmpeg)
+    # Try to make sure it shows status, even when writing multiple outputs
+    CMD+=(-stats -analyzeduration 100M -probesize 100M)
+    # When I switched from using xargs to running in a loop, I started seeing these in the logs:
+    # Enter command: <target>|all <time>|-1 <command>[ <argument>]
+    # A quick search brought up a stackoverflow with someone doing exactly what I'm doing: running ffmpeg in a loop from
+    # find results to transcode for plex! The problem appears to be that ffmpeg is getting some input from stdin for some
+    # reason. Why is unknown, but this flag prevents it from reading anything there.
+    CMD+=(-nostdin)
+
     # On the first output, naturally start from the beginning of the input. On subsequent outputs, start from the split
     # time.
     if [ "$i" -gt 0 ]; then
-      output_args+=(-ss "${split_times[i]}")
-      next="${split_times[i+1]}"
+      CMD+=(-ss "${split_times[i]}")
     fi
     # Likewise, include the "to" time on all but the last output, allowing encoding to naturally end at the end of the
     # input.
     if [ "$i" -lt "${#output_abs_paths[@]}" ]; then
       to_time="${split_times[i+1]}"
       if [ -n "$to_time" ]; then
-        output_args+=(-to "$to_time")
+        CMD+=(-to "$to_time")
       fi
     fi
-    # This because several videos end up failing with the "Too many packets buffered for output stream XXX" error.
-    # I don't think this will cause any problems. Raised to 4096 on Gemini's advice that 1024 may be too low for some HD
-    # content.
-    output_args+=(-max_muxing_queue_size 4096)
+
+    # Running in docker lately, I've noticed it seems stuck at two cores max. Gemini suggests ffmpeg itself may be to
+    # blame in how it detects available threads. Let's tell it how many to use, just to be safe.
+    # Continued: it turns out x265 has a completely separate setting and doesn't obey this. Find it up in the
+    # encoder_settings. I'm leaving this just because.
+    CMD+=(-threads "$(nproc)")
+
+    [ -n "$USE_GPU" ] && ! [ "$NEVER_GPU" ] && CMD+=(-hwaccel cuda -hwaccel_output_format cuda)
+    CMD+=(-hide_banner -y -i "$input_abs_path")
+
+    # If doing cuts, use the concat file to attach cut subtitles from the input file
+    if [ -n "$COMPLEXFILTER" ]; then
+      CMD+=(-safe 0 -f concat -i "$concat_cache_file")
+    fi
+
     # Use one filter or the other, if set. Setting both will cause an error, but that's checked earlier, and even if it's not,
     # ffmpeg will tell you what you did wrong.
-    [ -z "$COMPLEXFILTER" ] || output_args+=(-filter_complex "$COMPLEXFILTER")
+    [ -z "$COMPLEXFILTER" ] || CMD+=(-filter_complex "$COMPLEXFILTER")
     read -ra maps_array <<<"$MAPS"
-    output_args+=("${maps_array[@]}")
+    CMD+=("${maps_array[@]}")
     if [ -n "$VFILTERSTRING" ]; then
       if [ -n "$USE_GPU" ]; then
-        output_args+=("-filter:v:0" "hwdownload,format=nv12,$VFILTERSTRING,hwupload_cuda")
+        CMD+=("-filter:v:0" "hwdownload,format=nv12,$VFILTERSTRING,hwupload_cuda")
       else
-        output_args+=("-filter:v:0" "$VFILTERSTRING")
+        CMD+=("-filter:v:0" "$VFILTERSTRING")
       fi
     fi
 
     # Do real video encoding, or speed encode for checking the output?
     if [ "$QUALITY" = "rough" ]; then
-      #output_args+=(-c:0 mpeg2video -threads:0 2)
-      output_args+=(-c:0 libx264 -preset ultrafast)
+      #CMD+=(-c:0 mpeg2video -threads:0 2)
+      CMD+=(-c:0 libx264 -preset ultrafast)
     else
       if [ -n "$USE_GPU" ] && [ -z "$NEVER_GPU" ]; then
-        output_args+=(-c:0 hevc_nvenc)
+        CMD+=(-c:0 hevc_nvenc)
       else
-        output_args+=(-c:0 "$encoder" "${encoder_settings[@]}" -crf:0 "$VQ")
+        CMD+=(-c:0 "$encoder" "${encoder_settings[@]}" -crf:0 "$VQ")
       fi
     fi
-    output_args+=(-c:a copy -c:s copy)
+    CMD+=(-c:a copy -c:s copy)
     if [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ]; then
-      output_args+=(-c:1 ac3 -ac:1 6 -b:1 384k)
+      CMD+=(-c:1 ac3 -ac:1 6 -b:1 384k)
     fi
     # If cutting is happening, encodings to apply will have been calculated previously. You can't do any stream copies
     # when using a complex filtergraph, so every stream needs an encoding.
     [ -n "$COMPLEXFILTER" ] && {
-      output_args+=("${encodings[@]}")
+      CMD+=("${encodings[@]}")
     }
-    output_args+=(-metadata:s:0 "encoded_by=My smart encoder script")
+    CMD+=(-metadata:s:0 "encoded_by=My smart encoder script")
     if [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ]; then
-      output_args+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
+      CMD+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
     fi
+    # This because several videos end up failing with the "Too many packets buffered for output stream XXX" error.
+    # I don't think this will cause any problems. Raised to 4096 on Gemini's advice that 1024 may be too low for some HD
+    # content.
+    CMD+=(-max_muxing_queue_size 4096)
     # I probably should make this an array. I'd just have to convert a whole lot of configs.
     read -ra extra_opts options_arr <<<"$FFMPEG_EXTRA_OPTIONS"
-    output_args+=("${extra_opts[@]}" -f matroska)
+    CMD+=("${extra_opts[@]}" -f matroska)
     # STOP MARKING SUBTITLE STREAM 0 AS THE DEFAULT!
-    output_args+=(-default_mode infer_no_subs)
+    CMD+=(-default_mode infer_no_subs)
     # And finally, where to write the output
-    output_args+=("$output_tmp_path")
-    debug "Created outputs for: '$output_tmp_path'"
-    debug "  outputs: '${output_args[*]}'"
-  done
+    CMD+=("$output_tmp_path")
 
-  # Just to be safe, unset the temp vars that were used above so that we don't confuse them with anything later on.
-  unset output_abs_path output_tmp_path formatted_output_rel_path done_file already_done
+    LOGFILE="$LOGDIR/$input_rel_path.log"
 
-  cleanup_files="$lock_file"
-  for f in "${output_tmp_paths[@]}"; do
-    cleanup_files="$cleanup_files|$f"
-  done
-  trap "cleanup '$cleanup_files'" EXIT
+    echo -n "  "
+    for arg in "${CMD[@]}"; do
+      echo -n "\"${arg//\"/\\\"}\" "
+    done
+    echo ""
+    echo "  View logs:"
+    echo "    tail -f \"$LOGFILE\""
+    echo "    tail -F currentlog"
 
-  # Always display the movie length because I use that to gauge
-  # progress when watching the logs.
-  input_length=$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=DURATION-eng -of default=noprint_wrappers=1:nokey=1 "$input_abs_path" | cut -d '.' -f 1)
-  echo "  duration: $input_length"
+    mkdir -p "$(dirname "$output_abs_path")"
+    mkdir -p "$(dirname "$LOGFILE")"
+    if [ -n "$DRYRUN" ]; then
+      echo "  -- dry run requested, not running"
+    else
+      echo "  start: $(date)"
+      ln -fs "$LOGFILE" currentlog
+      "${CMD[@]}" &> "$LOGFILE"
+      encode_result="$?"
+      echo "  end  : $(date)"
+    fi
 
-  # Use locally installed ffmpeg, or a docker container?
-  CMD=(ffmpeg)
-  # Try to make sure it shows status, even when writing multiple outputs
-  CMD+=(-stats -analyzeduration 100M -probesize 100M)
-  # When I switched from using xargs to running in a loop, I started seeing these in the logs:
-  # Enter command: <target>|all <time>|-1 <command>[ <argument>]
-  # A quick search brought up a stackoverflow with someone doing exactly what I'm doing: running ffmpeg in a loop from
-  # find results to transcode for plex! The problem appears to be that ffmpeg is getting some input from stdin for some
-  # reason. Why is unknown, but this flag prevents it from reading anything there.
-  CMD+=(-nostdin)
-  #CMD=(docker run --rm -v "$TOOLSDIR":"$TOOLSDIR" -v "$MOVIESDIR":"$MOVIESDIR" -w "$(pwd)" jrottenberg/ffmpeg -stats)
-
-  # Running in docker lately, I've noticed it seems stuck at two cores max. Gemini suggests ffmpeg itself may be to
-  # blame in how it detects available threads. Let's tell it how many to use, just to be safe.
-  # Continued: it turns out x265 has a completely separate setting and doesn't obey this. Find it up in the
-  # encoder_settings. I'm leaving this just because.
-  CMD+=(-threads "$(nproc)")
-
-  [ -n "$USE_GPU" ] && ! [ "$NEVER_GPU" ] && CMD+=(-hwaccel cuda -hwaccel_output_format cuda)
-  CMD+=(-hide_banner -y -i "$input_abs_path")
-
-  # If doing cuts, use the concat file to attach cut subtitles from the input file
-  if [ -n "$COMPLEXFILTER" ]; then
-    CMD+=(-safe 0 -f concat -i "$concat_cache_file")
-  fi
-
-  CMD+=("${output_args[@]}")
-  LOGFILE="$LOGDIR/$input_rel_path.log"
-
-  echo -n "  "
-  for arg in "${CMD[@]}"; do
-    echo -n "\"${arg//\"/\\\"}\" "
-  done
-  echo ""
-  echo "  View logs:"
-  echo "    tail -f \"$LOGFILE\""
-  echo "    tail -F currentlog"
-
-  for path in "${output_abs_paths[@]}"; do
-    mkdir -p "$(dirname "$path")"
-  done
-  mkdir -p "$(dirname "$LOGFILE")"
-  if [ -n "$DRYRUN" ]; then
-    echo "  -- dry run requested, not running"
-  else
-    echo "  start: $(date)"
-    ln -fs "$LOGFILE" currentlog
-    "${CMD[@]}" &> "$LOGFILE"
-    encode_result="$?"
-    echo "  end  : $(date)"
-  fi
-
-  if [ "$QUALITY" = "rough" ]; then
-    echo "Rough encode done, not marking file as done done."
-  elif [ -n "$DRYRUN" ]; then
-    echo "Dry run, not marking file as done done."
-  elif [ "$encode_result" -eq 0 ]; then
-    echo "Marking file as done done."
-    for i in "${!output_abs_paths[@]}"; do
-      output_tmp_path="${output_tmp_paths[i]}"
-      output_abs_path="${output_abs_paths[i]}"
-      done_file="${done_files[i]}"
+    if [ "$QUALITY" = "rough" ]; then
+      echo "Rough encode done, not marking file as done done."
+    elif [ -n "$DRYRUN" ]; then
+      echo "Dry run, not marking file as done done."
+    elif [ "$encode_result" -eq 0 ]; then
+      echo "Marking file as done done."
       if [ -z "$output_tmp_path" ] || [ -z "$output_abs_path" ] || [ -z "$done_file" ]; then
         die "Something went horribly wrong: tmp='$output_tmp_path' abs='$output_abs_path' done='$done_file'"
       fi
       mv "$output_tmp_path" "$output_abs_path" && mkdir -p "$(dirname "$done_file")" && touch "$done_file"
-    done
-  else
+    else
+      echo ""
+      echo "Encoding not done?"
+      exit 1
+    fi
     echo ""
-    echo "Encoding not done?"
-    exit 1
-  fi
-  echo ""
-  # Unlock after marking it done, or someone else may pick it up. Of course, there's still a slight chance of race
-  # condition here...
+  done
+
   rm -f "$lock_file"
 }
 export -f encode_one
