@@ -626,9 +626,7 @@ EOF
     debug "no complex filter; mapping that way"
     # Let KEEP_STREAMS=all mean map every stream. With ffmpeg and one input, a "-map 0" will do that.
     if [ "$KEEP_STREAMS" = all ]; then
-      # When a rip has a weird stream that's not really a stream, it seems to break ffmpeg's time and speed estimates.
-      # only include true video, audio, and subtitle (if present) streams.
-      MAPS="-map 0:V -map 0:a -map 0:s?"
+      MAPS="-map 0"
     else
       for S in "${KEEP_STREAMS[@]}"; do
         MAPS="$MAPS -map $S"
