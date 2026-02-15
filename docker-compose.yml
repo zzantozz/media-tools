@@ -34,14 +34,19 @@ services:
       - /mnt/tmp1:/mnt/tmp1
       - /mnt/tmp2:/mnt/tmp2
     environment:
+      # Common flags to twiddle on the script
       - DEBUG=${DEBUG:-}
       - LS_OPTS=${LS_OPTS:-}
+      - FILTER_INPUT=${FILTER_INPUT:-}
+
+      # Less common flags
+      - MODE=${MODE:-STABLE}
+      - ALT_OUTPUT_DIRS=${ALT_OUTPUT_DIRS:-}
+
+      # Dir mappings that are pretty static
       - TVSHOWSDIR=/mnt/encode-target/tv-shows
       - MOVIESDIR=/mnt/encode-target/movies
       - WORKDIR=/mnt/encode-target/work
       - INPUT_DIRS=${INPUT_DIRS:-/mnt/j/ripping:/mnt/k/ripping:/mnt/l/ripping}
       - CACHEDIR=/mnt/d/ripping-work/cache
-      - MODE=${MODE:-}
-#      - ALT_OUTPUT_DIRS=/mnt/tmp1/plex-media-server/encoded/movies:/mnt/tmp1/plex-media-server/encoded/tv-shows:/mnt/tmp2/plex-media-server/encoded/movies:/mnt/tmp2/plex-media-server/encoded/tv-shows
-      - FILTER_INPUT=${FILTER_INPUT:-}
     command: /media-tools/allinone/encode.sh
