@@ -699,8 +699,9 @@ EOF
       fi
     fi
     # This because several videos end up failing with the "Too many packets buffered for output stream XXX" error.
-    # I don't think this will cause any problems.
-    output_args+=(-max_muxing_queue_size 1024)
+    # I don't think this will cause any problems. Raised to 4096 on Gemini's advice that 1024 may be too low for some HD
+    # content.
+    output_args+=(-max_muxing_queue_size 4096)
     # Use one filter or the other, if set. Setting both will cause an error, but that's checked earlier, and even if it's not,
     # ffmpeg will tell you what you did wrong.
     [ -z "$COMPLEXFILTER" ] || output_args+=(-filter_complex "$COMPLEXFILTER")
@@ -760,6 +761,8 @@ EOF
 
   # Use locally installed ffmpeg, or a docker container?
   CMD=(ffmpeg)
+  # Try to make sure it shows status, even when writing multiple outputs
+  CMD+=(-stats -analyzeduration 100M -probesize 100M)
   # When I switched from using xargs to running in a loop, I started seeing these in the logs:
   # Enter command: <target>|all <time>|-1 <command>[ <argument>]
   # A quick search brought up a stackoverflow with someone doing exactly what I'm doing: running ffmpeg in a loop from
