@@ -121,6 +121,9 @@ function cleanup {
 export -f cleanup
 
 function encode_one {
+  # Be absolutely, 100% sure that we dont' have variables bleeding over between calls
+  [ -z "$canary" ] || die "Not running in isolated env! Panic!"
+  canary='not dead'
   readarray -d '' args
   input_dir="${args[0]}"
   input_rel_path="${args[1]}"
