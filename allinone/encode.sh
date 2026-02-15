@@ -83,7 +83,7 @@ debug "Running from $script_dir"
 function cleanup {
   IFS='|' read -r -a args <<<"$1"
   lock_file="${args[0]}"
-  output_tmp_path=("${args[1]}")
+  output_tmp_path="${args[1]}"
   if [ -f "$lock_file" ]; then
     echo "Clean up lock file: '$lock_file'"
     rm -f "$lock_file"
@@ -293,6 +293,7 @@ function encode_one {
   }
 
   output_tmp_paths=()
+  output_rel_paths=()
   output_abs_paths=()
   done_files=()
   done_states=()
@@ -352,6 +353,7 @@ function encode_one {
     fi
 
     output_tmp_paths+=("$output_tmp_path")
+    output_rel_paths+=("$formatted_output_rel_path")
     output_abs_paths+=("$output_abs_path")
     done_files+=("$done_file")
 
@@ -666,6 +668,7 @@ EOF
   for i in "${!output_abs_paths[@]}"; do
     debug "Output $i"
     output_tmp_path="${output_tmp_paths[i]}"
+    output_rel_path="${output_rel_paths[i]}"
     output_abs_path="${output_abs_paths[i]}"
     done_file="${done_files[i]}"
     done_state="${done_states[i]}"
@@ -775,7 +778,7 @@ EOF
     # And finally, where to write the output
     CMD+=("$output_tmp_path")
 
-    LOGFILE="$LOGDIR/$input_rel_path.log"
+    LOGFILE="$LOGDIR/$output_rel_path.log"
 
     echo -n "  "
     for arg in "${CMD[@]}"; do
