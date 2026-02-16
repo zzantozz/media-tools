@@ -802,8 +802,14 @@ EOF
     forced_sub_stream=$("$TOOLSDIR/forced-subs.sh" -i "$input_abs_path") || \
         die "Failed to check forced subs on '$input_abs_path'"
     if [ "$forced_sub_stream" != none ]; then
-      debug "Found likely forced sub stream: $forced_sub_stream"
-      CMD+=(-disposition:"$forced_sub_stream" forced)
+      # forced_sub_stream is the input stream index (e.g., "7" means stream 0:7)
+      # Look up the output stream index for this input stream
+      input_stream_id="0:$forced_sub_stream"
+      debug "Found likely forced subtitle stream in input: $input_stream_id"
+      output_sub_index="${input_to_output_map[$input_stream_id]}"
+      [ -n "$output_sub_index" ] || \
+        die "Could not find output index for forced subtitle input stream $input_stream_id. Stream may not be mapped in output."
+      CMD+=(-disposition:"$output_sub_index" forced)
     fi
     CMD+=(-metadata:s:0 "encoded_by=My smart encoder script")
     if [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ]; then
