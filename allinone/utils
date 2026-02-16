@@ -7,6 +7,9 @@
 
 die() {
   echo -e "ERROR: $1" >&2
+  if declare -F usage >/dev/null; then
+    usage
+  fi
   exit 1
 }
 
@@ -48,3 +51,7 @@ sanitize() {
   sanitized="$(echo "$sanitized" | tr -s ' ')"
   echo "$sanitized"
 }
+
+red=$'\033[0;31m'
+green=$'\033[0;32m'
+nc=$'\033[0m'
