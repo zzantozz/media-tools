@@ -58,6 +58,12 @@ debug "  forced sub stream length threshold: ${threshold}%"
 raw_data="$(ffprobe -i "$input" -v error -select_streams s -show_entries stream=index:stream_tags=NUMBER_OF_FRAMES-eng,NUMBER_OF_BYTES-eng -of csv=p=0)" || \
   die "Failed to get stream data"
 
+[ -z "${raw_data//[[:blank:]]/}" ] && {
+  debug "No subs detected means no forced subs"
+  echo "none"
+  exit 0
+}
+
 debug "  raw sub data\n---\n$raw_data\n---"
 
 readarray -t data_lines <<<"$raw_data"
@@ -103,7 +109,7 @@ for i in "${!indexes[@]}"; do
 done
 
 if [ ${#forced[@]} -gt 1 ]; then
-  die "More than one subtitle identified as probable forced."
+  die "More than one subtitle identified as probable forced. All detected: ${forced[*]}"
 elif [ ${#forced[@]} -eq 1 ]; then
   echo "${forced[0]}"
 elif [ ${#forced[@]} -eq 0 ]; then
