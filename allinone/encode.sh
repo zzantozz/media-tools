@@ -764,6 +764,12 @@ EOF
     # Suggested by Gemini to handle edge cases where cutting video might result in negative timestamps from weird
     # bluray lead-in buffers or something. It claims it can't hurt anything and is a good safety net.
     CMD+=(-avoid_negative_ts make_zero)
+    # Look for subs that should be forced (fingers crossed)
+    forced_sub_stream=$("$TOOLSDIR/forced-subs.sh" -i "$input_abs_path") || \
+        die "Failed to check forced subs on '$input_abs_path'"
+    if [ "$forced_sub_stream" != none ]; then
+      CMD+=(-disposition:"$forced_sub_stream" forced)
+    fi
     CMD+=(-metadata:s:0 "encoded_by=My smart encoder script")
     if [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ]; then
       CMD+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
