@@ -795,6 +795,7 @@ EOF
     echo ""
     echo "  View logs:"
     echo "    tail -f \"$LOGFILE\""
+    echo "    tail -f \"$script_dir/currentlog\""
     echo "    tail -F currentlog"
 
     mkdir -p "$(dirname "$output_abs_path")"
