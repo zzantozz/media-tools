@@ -866,7 +866,7 @@ filter_input() {
     printf "%s\0%s" "$input_dir" "$input_path" | bash -c encode_one &
     child_pid=$!
     trap term_child EXIT
-    wait "$child_pid"
+    wait "$child_pid" || true
   else
     debug "Filtered out '$input_path'"
   fi
