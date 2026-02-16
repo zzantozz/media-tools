@@ -768,6 +768,7 @@ EOF
     forced_sub_stream=$("$TOOLSDIR/forced-subs.sh" -i "$input_abs_path") || \
         die "Failed to check forced subs on '$input_abs_path'"
     if [ "$forced_sub_stream" != none ]; then
+      debug "Found likely forced sub stream: $forced_sub_stream"
       CMD+=(-disposition:"$forced_sub_stream" forced)
     fi
     CMD+=(-metadata:s:0 "encoded_by=My smart encoder script")
@@ -795,7 +796,7 @@ EOF
     echo ""
     echo "  View logs:"
     echo "    tail -f \"$LOGFILE\""
-    echo "    tail -f \"$script_dir/currentlog\""
+    echo "    tail -f allinone/currentlog"
     echo "    tail -F currentlog"
 
     mkdir -p "$(dirname "$output_abs_path")"
