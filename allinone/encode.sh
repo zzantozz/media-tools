@@ -581,43 +581,61 @@ EOF
     exit 1
   }
 
+  # Holder for the mappings of our output streams, like "-map 0" or "-map 0:3" or "-map [outa]" or "-map -m:filename:cover.jpg".
   declare -a map_args=()
+  # Keeps track of which input stream is mapped to which output stream. Keys are like "0:1" and values are integers
+  # counting up from 0.
+  declare -A input_to_output_map
+  # Our counters for which stream we're mapping to which. I may not actually need both counters, but it's much easier
+  # to keep track of what's what if they're both explicit.
+  input_stream_index=0
+  output_stream_index=0
   encodings=()
   if [ -n "$COMPLEXFILTER" ]; then
     debug "have complex filter; mapping this way"
-    s_idx=0
     read -ra ALLOUTS <<<"$OUTSTRING"
     while read -r line; do
       if [[ "$line" =~ Stream\ #(.:.+)\([^\)]*\):\ (Video|Audio|Subtitle): ]]; then
+        # I think this will always point to the same stream as input_stream_index?
         stream="${BASH_REMATCH[1]}"
+        [ "$stream" = "0:$input_stream_index" ] ||
+          die "Assumption violated - stream=$stream and input_stream_index=$input_stream_index"
+        input_to_output_map["$stream"]="$output_stream_index"
         stream_type="${BASH_REMATCH[2]}"
         case "$stream_type" in
           Video)
             debug "Map stream $stream as video"
-            map_args+=(-map "${ALLOUTS[$s_idx]}")
+            # Get the next made-up "output specifier" from our constant array
+            map_args+=(-map "${ALLOUTS[$output_stream_index]}")
             # Video encoding settings are handled later, though it assumes only a single video stream.
             ;;
           Audio)
             debug "Map stream $stream as audio"
-            map_args+=(-map "${ALLOUTS[$s_idx]}")
-            encodings+=("-c:$s_idx" "ac3" "-ac:$s_idx" "6" "-b:$s_idx" "384k")
+            # Get the next made-up "output specifier" from our constant array
+            map_args+=(-map "${ALLOUTS[$output_stream_index]}")
+            encodings+=("-c:$output_stream_index" "ac3" "-ac:$output_stream_index" "6" "-b:$output_stream_index" "384k")
             ;;
           Subtitle)
             debug "Map stream $stream as subtitle"
-            map_args+=(-map "1:$s_idx")
+            # Read the nth input stream from the *second* output - the concat file with the sliced up subtitles.
+            map_args+=(-map "1:$input_stream_index")
             # No encoding for subtitle streams. They're handled by the concat file.
             ;;
           *)
-            echo "Stream $stream has unkown type $stream_type" >&2
+            echo "Stream $stream has unknown type $stream_type" >&2
             exit 1
             ;;
         esac
+        # Only increment the output stream index if we actually mapped a stream!
+        output_stream_index=$((output_stream_index+1))
       elif [[ "$line" =~ mjpeg\ .*\(attached\ pic\) ]]; then
         :
       else
         echo "Couldn't detect stream type" >&2
         exit 1
       fi
+      # Increment input stream index for every stream we read, no matter how it's handled.
+      input_stream_index=$((input_stream_index+1))
       s_idx=$((s_idx+1))
     done <<<"$stream_data"
 #    	NMAPS="${#CUT_STREAMS[@]}"
@@ -635,43 +653,52 @@ EOF
       map_args+=(-map "-m:filename:cover.jpg")
       map_args+=(-map "-m:filename:cover.jpeg")
       map_args+=(-map "-m:filename:cover.png")
+      # For -map 0, we need to use ffmpeg to determine the actual mappings
+      use_ffmpeg_for_mapping=true
     else
       for S in "${KEEP_STREAMS[@]}"; do
         # Skip 0:0 if TRANSCODE_AUDIO is set, since we'll add it explicitly later
         [ -n "$TRANSCODE_AUDIO" ] && [ "$S" = "0:0" ] && continue
         map_args+=(-map "$S")
+        input_to_output_map["$S"]="$output_stream_index"
+        debug "  Input stream $S -> Output stream $output_stream_index"
+        output_stream_index=$((output_stream_index+1))
       done
     fi
   fi
-  [ -n "$TRANSCODE_AUDIO" ] && {
-    # Prepend video (0:0) and transcoded audio to all other mappings
-    map_args=(-map "0:0" -map "$TRANSCODE_AUDIO" "${map_args[@]}")
-  }
+
+  # I want to stop using this. It's old, probably not ideal, and complicates the stream mapping now.
+  [ -n "$TRANSCODE_AUDIO" ] && die "No longer supported!"
+#  [ -n "$TRANSCODE_AUDIO" ] && {
+#    # Prepend video (0:0) and transcoded audio to all other mappings
+#    map_args=(-map "0:0" -map "$TRANSCODE_AUDIO" "${map_args[@]}")
+#  }
 
   debug "MAPS: ${map_args[*]}"
 
-  # Use ffmpeg to determine which input streams map to which output indices
-  # Run with -frames:v 0 to stop after analyzing streams without processing frames
-  ffmpeg_dryrun=$(ffmpeg -hide_banner -i "$input_abs_path" "${map_args[@]}" \
-    -frames:v 0 -c copy -f null - 2>&1) || {
-    # ffmpeg exits non-zero with -frames:v 0, but check if it actually failed
-    if [[ ! "$ffmpeg_dryrun" =~ "Stream mapping:" ]]; then
+  # Only do this if we had to added non-specific output mappings, like `-map 0:V` or something. Only ffmpeg will really
+  # know what inputs there are for that.
+  # NOTE: I could use the input stream data I already gathered from ffprobe earlier, as long as the mappings stay
+  # simple, but this will be more robust in the long term, I think. If it causes problems, rethink it.
+  if [ "$use_ffmpeg_for_mapping" = true ]; then
+    # Use ffmpeg to determine which input streams map to which output indices
+    # Run with -frames:v 0 to stop after analyzing streams without processing frames
+    stream_mappings=$(ffmpeg -hide_banner -i "$input_abs_path" "${map_args[@]}" -frames:v 0 -c copy -f null - 2>&1 | grep 'Stream.* -> ') ||
       die "ffmpeg failed to analyze stream mapping"
-    fi
-  }
+    [ -n "${stream_mappings//[[:blank:]]/}" ] || die "No stream mappings detected"
 
-  # Parse the stream mapping output
-  # Look for lines like "Stream #0:2 -> #0:1" which means input 0:2 maps to output 0:1
-  declare -A input_to_output_map
-  while read -r line; do
-    if [[ "$line" =~ Stream\ #([0-9]+):([0-9]+)\ -\>\ #[0-9]+:([0-9]+) ]]; then
+    # Parse the stream mapping output
+    # Look for lines like "Stream #0:2 -> #0:1" which means input 0:2 maps to output 0:1
+    declare -A input_to_output_map
+    while read -r line; do
+      [[ "$line" =~ Stream\ #([0-9]+):([0-9]+)\ -\>\ #[0-9]+:([0-9]+) ]] ||
+        die "Stream mapping line doesn't match regex: '$line'"
       input_file="${BASH_REMATCH[1]}"
       input_stream="${BASH_REMATCH[2]}"
       output_stream="${BASH_REMATCH[3]}"
       input_to_output_map["$input_file:$input_stream"]="$output_stream"
-      debug "  Input stream $input_file:$input_stream -> Output stream $output_stream"
-    fi
-  done <<<"$ffmpeg_dryrun"
+    done <<<"$stream_mappings"
+  fi
 
   debug "Input to output stream mapping:"
   for key in "${!input_to_output_map[@]}"; do
@@ -808,7 +835,7 @@ EOF
       debug "Found likely forced subtitle stream in input: $input_stream_id"
       output_sub_index="${input_to_output_map[$input_stream_id]}"
       [ -n "$output_sub_index" ] || \
-        die "Could not find output index for forced subtitle input stream $input_stream_id. Stream may not be mapped in output."
+        die "Couldn't find output for forced subtitle input stream $input_stream_id. Is it mapped?"
       CMD+=(-disposition:"$output_sub_index" forced)
     fi
     CMD+=(-metadata:s:0 "encoded_by=My smart encoder script")
