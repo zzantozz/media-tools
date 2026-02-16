@@ -580,7 +580,8 @@ EOF
     echo "KEEP_STREAMS should be known by now" >&2
     exit 1
   }
-  MAPS=""
+
+  declare -a map_args=()
   encodings=()
   if [ -n "$COMPLEXFILTER" ]; then
     debug "have complex filter; mapping this way"
@@ -593,17 +594,17 @@ EOF
         case "$stream_type" in
           Video)
             debug "Map stream $stream as video"
-            MAPS="$MAPS -map ${ALLOUTS[$s_idx]}"
+            map_args+=(-map "${ALLOUTS[$s_idx]}")
             # Video encoding settings are handled later, though it assumes only a single video stream.
             ;;
           Audio)
             debug "Map stream $stream as audio"
-            MAPS="$MAPS -map ${ALLOUTS[$s_idx]}"
+            map_args+=(-map "${ALLOUTS[$s_idx]}")
             encodings+=("-c:$s_idx" "ac3" "-ac:$s_idx" "6" "-b:$s_idx" "384k")
             ;;
           Subtitle)
             debug "Map stream $stream as subtitle"
-            MAPS="$MAPS -map 1:$s_idx"
+            map_args+=(-map "1:$s_idx")
             # No encoding for subtitle streams. They're handled by the concat file.
             ;;
           *)
@@ -630,18 +631,52 @@ EOF
     if [ "$KEEP_STREAMS" = all ]; then
       # When a rip has a weird stream that's not really a stream, it seems to break ffmpeg's time and speed estimates.
       # only include true video, audio, and subtitle (if present) streams.
-      MAPS="-map 0 -map -m:filename:cover.jpg -map -m:filename:cover.jpeg -map -m:filename:cover.png"
+      map_args+=(-map 0)
+      map_args+=(-map "-m:filename:cover.jpg")
+      map_args+=(-map "-m:filename:cover.jpeg")
+      map_args+=(-map "-m:filename:cover.png")
     else
       for S in "${KEEP_STREAMS[@]}"; do
-        MAPS="$MAPS -map $S"
+        # Skip 0:0 if TRANSCODE_AUDIO is set, since we'll add it explicitly later
+        [ -n "$TRANSCODE_AUDIO" ] && [ "$S" = "0:0" ] && continue
+        map_args+=(-map "$S")
       done
     fi
   fi
   [ -n "$TRANSCODE_AUDIO" ] && {
-    MAPS="${MAPS# -map 0:0}"
-    MAPS="-map 0:0 -map $TRANSCODE_AUDIO $MAPS"
+    # Prepend video (0:0) and transcoded audio to all other mappings
+    map_args=(-map "0:0" -map "$TRANSCODE_AUDIO" "${map_args[@]}")
   }
-  debug "MAPS: $MAPS"
+
+  debug "MAPS: ${map_args[*]}"
+
+  # Use ffmpeg to determine which input streams map to which output indices
+  # Run with -frames:v 0 to stop after analyzing streams without processing frames
+  ffmpeg_dryrun=$(ffmpeg -hide_banner -i "$input_abs_path" "${map_args[@]}" \
+    -frames:v 0 -c copy -f null - 2>&1) || {
+    # ffmpeg exits non-zero with -frames:v 0, but check if it actually failed
+    if [[ ! "$ffmpeg_dryrun" =~ "Stream mapping:" ]]; then
+      die "ffmpeg failed to analyze stream mapping"
+    fi
+  }
+
+  # Parse the stream mapping output
+  # Look for lines like "Stream #0:2 -> #0:1" which means input 0:2 maps to output 0:1
+  declare -A input_to_output_map
+  while read -r line; do
+    if [[ "$line" =~ Stream\ #([0-9]+):([0-9]+)\ -\>\ #[0-9]+:([0-9]+) ]]; then
+      input_file="${BASH_REMATCH[1]}"
+      input_stream="${BASH_REMATCH[2]}"
+      output_stream="${BASH_REMATCH[3]}"
+      input_to_output_map["$input_file:$input_stream"]="$output_stream"
+      debug "  Input stream $input_file:$input_stream -> Output stream $output_stream"
+    fi
+  done <<<"$ffmpeg_dryrun"
+
+  debug "Input to output stream mapping:"
+  for key in "${!input_to_output_map[@]}"; do
+    debug "  $key -> ${input_to_output_map[$key]}"
+  done
 
   VFILTERSTRING="${VFILTERS[0]}"
   i=1
@@ -731,8 +766,7 @@ EOF
     # Use one filter or the other, if set. Setting both will cause an error, but that's checked earlier, and even if it's not,
     # ffmpeg will tell you what you did wrong.
     [ -z "$COMPLEXFILTER" ] || CMD+=(-filter_complex "$COMPLEXFILTER")
-    read -ra maps_array <<<"$MAPS"
-    CMD+=("${maps_array[@]}")
+    CMD+=("${map_args[@]}")
     if [ -n "$VFILTERSTRING" ]; then
       if [ -n "$USE_GPU" ]; then
         CMD+=("-filter:v:0" "hwdownload,format=nv12,$VFILTERSTRING,hwupload_cuda")
