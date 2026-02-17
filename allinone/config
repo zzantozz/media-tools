@@ -9,3 +9,5 @@
 
 input_dir="${INPUTDIR:-/mnt/l/ripping}"
 INPUTDIR="$input_dir"
+
+INPUT_DIRS="${INPUT_DIRS:-/mnt/j/ripping:/mnt/k/ripping:/mnt/l/ripping}"
