@@ -109,7 +109,12 @@ for i in "${!indexes[@]}"; do
 done
 
 if [ ${#forced[@]} -gt 1 ]; then
-  die "More than one subtitle identified as probable forced. All detected: ${forced[*]}"
+  echo "More than one subtitle identified as probable forced. All detected: ${forced[*]}." >&2
+  echo "You can diagnose more with:" >&2
+  for f in "${forced[@]}"; do
+    echo "ffprobe -v error -select_streams $f -read_intervals 0%+#11 -show_entries packet=dts_time -of csv=p=0 '$input' | head -5" >&2
+  done
+  exit 1
 elif [ ${#forced[@]} -eq 1 ]; then
   echo "${forced[0]}"
 elif [ ${#forced[@]} -eq 0 ]; then
