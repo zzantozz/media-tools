@@ -1,6 +1,8 @@
 #!/bin/bash -e
 
-. allinone/utils
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+
+source "$script_dir/allinone/config"
 
 [ $# -eq 1 ] || {
 	echo "Pass the name of a video file to determine what quality to encode with."
