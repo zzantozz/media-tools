@@ -828,16 +828,17 @@ EOF
     if [ -n "$FORCED_SUB_INPUT_STREAM" ]; then
       # Forced subs configured. Use that stream - it's the index in the input.
       forced_sub_stream="$FORCED_SUB_INPUT_STREAM"
+      debug "Using forced subtitle stream from config: $forced_sub_stream"
     else
       # Look for subs that should be forced (fingers crossed)
       forced_sub_stream=$("$TOOLSDIR/forced-subs.sh" -i "$input_abs_path") || \
         die "Failed to check forced subs on '$input_abs_path'"
+      debug "Found likely forced subtitle stream in input: $forced_sub_stream"
     fi
     if [ "$forced_sub_stream" != none ]; then
       # forced_sub_stream is the input stream index (e.g., "7" means stream 0:7)
       # Look up the output stream index for this input stream
       input_stream_id="0:$forced_sub_stream"
-      debug "Found likely forced subtitle stream in input: $input_stream_id"
       output_sub_index="${input_to_output_map[$input_stream_id]}"
       [ -n "$output_sub_index" ] || \
         die "Couldn't find output for forced subtitle input stream $input_stream_id. Is it mapped?"
