@@ -674,7 +674,7 @@ EOF
 #    map_args=(-map "0:0" -map "$TRANSCODE_AUDIO" "${map_args[@]}")
 #  }
 
-  debug "MAPS: ${map_args[*]}"
+  debug "Output maps: ${map_args[*]}"
 
   # Only do this if we had to added non-specific output mappings, like `-map 0:V` or something. Only ffmpeg will really
   # know what inputs there are for that.
@@ -700,10 +700,11 @@ EOF
     done <<<"$stream_mappings"
   fi
 
-  debug "Input to output stream mapping:"
+  mappings=''
   for key in "${!input_to_output_map[@]}"; do
-    debug "  $key -> ${input_to_output_map[$key]}"
+    mappings="$mappings $key -> ${input_to_output_map[$key]}"
   done
+  debug "Input to output stream mapping: $mappings"
 
   VFILTERSTRING="${VFILTERS[0]}"
   i=1
