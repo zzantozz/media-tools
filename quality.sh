@@ -1,12 +1,14 @@
 #!/bin/bash -e
 
+. allinone/utils
+
 [ $# -eq 1 ] || {
 	echo "Pass the name of a video file to determine what quality to encode with."
 	echo "Prints the x.265 CRF factor that should be used."
 	exit 1
 }
 
-DATA=$(ffprobe -i "$1" 2>&1 | grep "Stream #0:0")
+DATA=$(ffprobe -i "$1" 2>&1 | grep "Stream #0:0") || die "Failed to run ffprobe"
 
 if [[ "$DEBUG" =~ quality ]]; then
   echo "ffprobe output:" >&2
@@ -19,7 +21,6 @@ fi
 [[ $DATA =~ 1920x1080 ]] && Q=20
 [[ $DATA =~ 3840x2160 ]] && Q=20
 [ -z "$Q" ] && {
-	echo "Can't figure out what video quality to use." >&2
-	exit 1
+  die "Can't figure out what video quality to use. Data found was: '$DATA'"
 }
 echo $Q

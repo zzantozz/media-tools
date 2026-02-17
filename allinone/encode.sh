@@ -440,7 +440,7 @@ function encode_one {
     exit 1
   }
 
-  VQ=$("$TOOLSDIR/quality.sh" "$input_abs_path")
+  VQ=$("$TOOLSDIR/quality.sh" "$input_abs_path") || die "Failed to determine quality "
   debug "Quality: $VQ"
 
   # Okay, at this point, I think we've gathered all the information
