@@ -41,6 +41,21 @@ function duration_to_secs {
 }
 
 ##
+# Opposite of duration_to_secs
+#
+function secs_to_duration {
+  local input_seconds="$1"
+  local hours=$(echo "$input_seconds / 3600" | bc)
+  local remainder_seconds=$(echo "$input_seconds % 3600" | bc)
+  local minutes=$(echo "$remainder_seconds / 60" | bc)
+  local seconds=$(echo "$remainder_seconds % 60" | bc)
+  # Use printf for consistent two-digit padding for hours and minutes,
+  # and to handle potential single-digit seconds without losing the fractional part.
+  # The 'bc' output might start with a '.', so we handle that in the formatting.
+  printf "%02d:%02d:%05.3f\n" "$hours" "$minutes" "$seconds"
+}
+
+##
 # Sanitizes a name so that it can be used in a file path.
 #
 sanitize() {
