@@ -825,9 +825,14 @@ EOF
     # Suggested by Gemini to handle edge cases where cutting video might result in negative timestamps from weird
     # bluray lead-in buffers or something. It claims it can't hurt anything and is a good safety net.
     CMD+=(-avoid_negative_ts make_zero)
-    # Look for subs that should be forced (fingers crossed)
-    forced_sub_stream=$("$TOOLSDIR/forced-subs.sh" -i "$input_abs_path") || \
+    if [ -n "$FORCED_SUB_INPUT_STREAM" ]; then
+      # Forced subs configured. Use that stream - it's the index in the input.
+      forced_sub_stream="$FORCED_SUB_INPUT_STREAM"
+    else
+      # Look for subs that should be forced (fingers crossed)
+      forced_sub_stream=$("$TOOLSDIR/forced-subs.sh" -i "$input_abs_path") || \
         die "Failed to check forced subs on '$input_abs_path'"
+    fi
     if [ "$forced_sub_stream" != none ]; then
       # forced_sub_stream is the input stream index (e.g., "7" means stream 0:7)
       # Look up the output stream index for this input stream
