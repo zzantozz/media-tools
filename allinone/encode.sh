@@ -829,7 +829,7 @@ EOF
       # Look for subs that should be forced (fingers crossed)
       forced_sub_stream=$("$TOOLSDIR/forced-subs.sh" -i "$input_abs_path") || \
         die "Failed to check forced subs on '$input_abs_path'"
-      debug "Found likely forced subtitle stream in input: $forced_sub_stream"
+      debug "Auto-detected forced subtitle stream: $forced_sub_stream"
     fi
     if [ "$forced_sub_stream" != none ]; then
       # forced_sub_stream is the input stream index (e.g., "7" means stream 0:7)
