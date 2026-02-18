@@ -863,6 +863,15 @@ EOF
       cmd_string+="\"${arg//\"/\\\"}\" "
     done
     echo "  $cmd_string"
+    # Look! Now we know the command we're about to run, but we can still modify it. Let's stash the command in the
+    # metadata. It's a nice way to keep track of what was encoded with what.
+    cmd_length="${#CMD[@]}"
+    # Last arg ought to be the output file. It has to stay last, so store it and slice it off.
+    last_arg="${CMD[-1]}"
+    CMD=("${CMD[@]:0:$cmd_length-1}")
+    CMD+=(-metadata encode_cmd="$cmd_string")
+    CMD+=("$last_arg")
+
     echo "  View logs:"
     echo "    tail -f \"$LOGFILE\""
     echo "    tail -f allinone/currentlog"
