@@ -858,18 +858,20 @@ EOF
 
     LOGFILE="$LOGDIR/$output_rel_path.log"
 
-    echo -n "  "
+    cmd_string=''
     for arg in "${CMD[@]}"; do
-      echo -n "\"${arg//\"/\\\"}\" "
+      cmd_string+="\"${arg//\"/\\\"}\" "
     done
-    echo ""
+    echo "  $cmd_string"
     echo "  View logs:"
     echo "    tail -f \"$LOGFILE\""
     echo "    tail -f allinone/currentlog"
     echo "    tail -F currentlog"
+    echo "    cat '$LOGDIR/$output_rel_path.cmd'"
 
     mkdir -p "$(dirname "$output_abs_path")"
     mkdir -p "$(dirname "$LOGFILE")"
+    echo "$cmd_string" > "$LOGDIR/$output_rel_path.cmd"
     if [ -n "$DRYRUN" ]; then
       echo "  -- dry run requested, not running"
     else
