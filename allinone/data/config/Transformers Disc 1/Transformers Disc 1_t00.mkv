@@ -1,2 +1,5 @@
 OUTPUTNAME="Transformers (2007).mkv"
 KEEP_STREAMS=all
+# This has some sparse streams that are like commentary stuff, but the actual translation subtitles
+# are burned into the video.
+FORCED_SUB_INPUT_STREAM=none
