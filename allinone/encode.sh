@@ -232,7 +232,7 @@ function encode_one {
   # an OUTPUTNAME that puts the outputs in that structure, the output would have a season in it. Check with a more
   # strict regex here. Outputs should always look like "<show name>/Season N+/episode.mkv". Using the looser regex above
   # has wrongly identified a special feature that had "Season" in the name.
-  if [ -z "$SEASON" ] && [[ "$output_rel_path" =~ /[Ss]eason\ [[:digit:]]*/ ]]; then
+  if [ -z "$SEASON" ] && [[ "$output_rel_path" =~ /[Ss]eason\ ([[:digit:]]*)/ ]]; then
     SEASON="${BASH_REMATCH[1]}"
   fi
 
