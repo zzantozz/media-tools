@@ -42,7 +42,19 @@ Since there's so much old stuff scattered around, some of it intertwined, here's
    named that and rips all titles into that directory.
 
    > **Note:** This script isn't perfect yet, since it still relies on profile settings created by running the
-     MakeMKV gui. Make sure to use a minimum title length of 30 seconds to match existing data!
+     MakeMKV gui. In the gui, in advanced mode, set this as the selection criteria:
+
+     ```
+     -sel:all,+sel:(favlang|nolang),-sel:mvcvideo,=100:all,-10:favlang,+sel:attachment
+     ```
+
+     Just for reference, the default as of Jan 2026 is
+
+     ```
+     -sel:all,+sel:(favlang|nolang),-sel:mvcvideo,=100:all,-10:favlang
+     ```
+
+Make sure to use a minimum title length of 30 seconds to match existing data!
 
    > **Note2:** Despite what step 1 says, I normally run this script from a Git Bash shell on a windows box. I've
      had better luck with MakeMKV there.
@@ -66,6 +78,16 @@ Since there's so much old stuff scattered around, some of it intertwined, here's
 7. Run the [allinone encode script](allinone/encode.sh). It will start by complaining about several directories
    that you need to set. I won't explain all of them here. Once set up correctly, it will process all the input
    titles into output files based on the config data provided.
+
+   > **Note:** More recently, see the Dockerfile and docker-compose.yml in the root of the project. Build the docker
+     image as ffmpeg-for-server (I could clean this up to build on demand), and then you can start encoding by bringing
+     it up in compose. You can also scale it out if you want/need to. It's handy having all of the directories already
+     mapped. Docker commands:
+
+     ```
+     docker build -t ffmpeg-for-server .
+     rm -f allinone/stop; docker-compose down; docker-compose up --scale ffmpeg=1 -d; docker-compose logs -f
+     ```
 
 8. Point Plex at the output files.
 
