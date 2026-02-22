@@ -6,6 +6,7 @@ export script_dir
 source "$script_dir/config"
 
 source "$script_dir/utils"
+export -f debug
 export -f die
 
 # Base directories that contain details of media processing. "cache" is for temporary things. These shouldn't be committed.
@@ -43,12 +44,6 @@ export TOOLSDIR
 # so that I can experiment with it to begin with.
 WORKDIR="${WORKDIR:-}"
 export WORKDIR
-
-function debug {
-  [[ "$DEBUG" =~ "encode" ]] && echo -e "$1" 1>&2
-  return 0
-}
-export -f debug
 
 [ -d "$CACHEDIR" ] || die "CACHEDIR doesn't exist: $CACHEDIR"
 [ -d "$DATADIR" ] || die "DATADIR doesn't exist: $DATADIR"

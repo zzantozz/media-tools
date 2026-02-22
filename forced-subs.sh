@@ -5,12 +5,6 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 source "$script_dir/allinone/config"
 source "$script_dir/allinone/utils"
 
-debug() {
-  if [[ "$DEBUG" =~ forced-subs ]]; then
-    echo -e "$1" >&2
-  fi
-}
-
 usage() {
   echo "USAGE"
   echo "    Usage: $0 -i <mkv-file> [-t <threshold>]"
