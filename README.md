@@ -79,4 +79,10 @@ General rules for modern scripts:
 
 3. Write result to stdout. Write debug and errors to stderr.
 
-4. Turn on debug info when the DEBUG var contains the name of the script.
+4. Turn on debug info when the DEBUG var contains the name of the script - basically every script should begin this to get
+   basic utilitys, including the `debug` function, for free:
+
+    ```
+    script_dir="$(cd "$(dirname "$0")" && pwd)"
+    source "$script_dir/<relative path from project root>/allinone/utils"
+    ````
