@@ -874,7 +874,9 @@ EOF
     # Last arg ought to be the output file. It has to stay last, so store it and slice it off.
     last_arg="${CMD[-1]}"
     CMD=("${CMD[@]:0:$cmd_length-1}")
-#    CMD+=(-metadata encode_cmd="$cmd_string")
+    encoded="$(echo "$cmd_string" | base64)"
+    CMD+=(-metadata encode_cmd="$cmd_string")
+    CMD+=(-metadata encode_cmd_base64="$encoded")
     CMD+=("$last_arg")
 
     echo "  View logs:"
