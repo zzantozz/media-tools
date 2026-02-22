@@ -5,6 +5,15 @@
 # wants to use these shared functions.
 #
 
+_util_script_name="$(basename "$0")"
+_util_debug_token="${_util_script_name%.*}"
+
+debug() {
+  if [[ "$DEBUG" =~ $_util_debug_token ]]; then
+    echo -e "$1" >&2
+  fi
+}
+
 die() {
   echo -e "ERROR: $1" >&2
   # Let callers give variables to include in the output for context.
