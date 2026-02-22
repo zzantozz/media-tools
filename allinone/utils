@@ -7,6 +7,19 @@
 
 die() {
   echo -e "ERROR: $1" >&2
+  # Let callers give variables to include in the output for context.
+  shift
+  if [ "$#" -gt 0 ]; then
+    longest=0
+    for arg in "$@"; do
+      [ "${#arg}" -gt "$longest" ] && longest="${#arg}"
+    done
+    echo "  -- context --" >&2
+    for arg in "$@"; do
+      [ -n "${!arg}" ] && printf "  %${longest}s: %s\n" "$arg" "${!arg}" >&2
+    done
+  fi
+  # If this script has a usage function, invoke it
   if declare -F usage >/dev/null; then
     usage
   fi

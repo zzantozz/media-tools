@@ -245,7 +245,12 @@ function encode_one {
   fi
 
   # If the MAIN_TYPE isn't configured (usually isn't), then fall back to our guess.
-  [ -z "$MAIN_TYPE" ] && MAIN_TYPE="$MAIN_TYPE_GUESS"
+  if [ -n "$MAIN_TYPE" ]; then
+    debug "  main type explicitly set to '$MAIN_TYPE'"
+  else
+    MAIN_TYPE="$MAIN_TYPE_GUESS"
+    debug "  guessing that main type is '$MAIN_TYPE'"
+  fi
 
   # Based on what we know about the type, decide whether to put it in the movies output dir or the tv output dir.
   if [ "$MAIN_TYPE" = movie ]; then
@@ -254,6 +259,7 @@ function encode_one {
     # If it's a tv special, we might want to store it under a movie for organization. Plex is bad at handling tv
     # specials.
     if [ "$SPECIAL_TYPE" = movie ] && [ -n "$OUTPUTNAME" ] && ! [[ "$OUTPUTNAME" =~ ^Season ]]; then
+      debug "  configured to store TV specials in movies dir"
       base_output_dir="$MOVIESDIR"
       required_file="$base_output_dir/$MAIN_NAME/$MAIN_NAME.mkv"
       [ -f "$required_file" ] || \
@@ -350,6 +356,12 @@ function encode_one {
       done_states+=(true)
     else
       done_states+=(false)
+    fi
+
+    # Sanity check. Sometime MAIN_TYPE guessing gets it wrong.
+    if echo "$output_abs_path" | grep -F "$TVSHOWSDIR" &>/dev/null && ! echo "$output_abs_path" | grep -Fi 'season' &>/dev/null; then
+      die "All TV show output has to go into a 'Season XX' dir. Plex doesn't support TV specials like movie specials." \
+        "input_abs_path" "output_abs_path"
     fi
 
     output_tmp_paths+=("$output_tmp_path")
