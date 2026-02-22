@@ -11,7 +11,7 @@ export -f die
 # Base directories that contain details of media processing. "cache" is for temporary things. These shouldn't be committed.
 # "data" is where information is stored about how to process specific files. This should be committed. I normally keep these
 # in the same directory as the script. "data" is committed there.
-CACHEDIR="${CACHEDIR:-"$script_dir/cache"}"
+CACHEDIR="${CACHEDIR:-"/mnt/d/ripping-work/cache"}"
 export CACHEDIR
 DATADIR="${DATADIR:-"$script_dir/data"}"
 export DATADIR
