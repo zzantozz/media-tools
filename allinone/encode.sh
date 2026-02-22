@@ -57,7 +57,7 @@ export -f debug
 [ -d "$MOVIESDIR" ] || die "MOVIESDIR doesn't exist: $MOVIESDIR"
 [ -d "$TVSHOWSDIR" ] || die "TVSHOWSDIR doesn't exist: $TVSHOWSDIR"
 [ -d "$TOOLSDIR" ] || die "TOOLSDIR doesn't exist: $TOOLSDIR"
-[ -z "$WORKDIR" ] || [ -d "$WORKDIR" ] || die "WORKDIR doesn't exist: $WORKDIR"
+[ -d "$WORKDIR" ] || die "WORKDIR doesn't exist: $WORKDIR"
 
 if ! [ "$MODE" = FIRST_PASS ] && ! [ "$MODE" = STABLE ] && ! [ "$MODE" = POLISHED ]; then
   die "You have to set a MODE. There's no default yet. Choose one of: FIRST_PASS | STABLE | POLISHED.\n \
