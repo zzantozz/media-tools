@@ -1,2 +1,4 @@
 OUTPUTNAME="Terminator 3 - Rise of the Machines.mkv"
 KEEP_STREAMS=all
+# The script detects a bad stream - what seems to be a partial director's commentary
+FORCED_SUB_INPUT_STREAM=none
