@@ -732,10 +732,22 @@ EOF
     exit 1
   fi
 
+  video_entries_to_get="stream_tags=NUMBER_OF_FRAMES-eng,DURATION-eng"
+  video_data_raw="$(ffprobe -v error -select_streams 0 -show_entries $video_entries_to_get -of default=nw=1 -i "$input_abs_path")" || \
+    die "Failed to get video data."
+  declare -A video_data
+  while read -r line; do
+    IFS='=' read -ra kv <<<"$line"
+    k="${kv[0]}"
+    v="${kv[1]}"
+    video_data["$k"]="$v"
+  done <<<"$video_data_raw"
+
   # Always display the movie length because I use that to gauge
   # progress when watching the logs.
-  input_length=$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=DURATION-eng -of default=noprint_wrappers=1:nokey=1 "$input_abs_path" | cut -d '.' -f 1)
-  echo "  duration: $input_length"
+  input_length="${video_data[TAG:DURATION-eng]%.*}"
+  input_frames="${video_data[TAG:NUMBER_OF_FRAMES-eng]}"
+  echo "  video length: $input_length - $input_frames frames"
 
   # Second loop to actually process the discovered outputs. This builds the output part of the ffmpeg command by putting
   # together everything we've gathered so far, like the video filters, the one or more output files, any extra ffmpeg
