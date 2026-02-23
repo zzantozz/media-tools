@@ -6,8 +6,15 @@ export script_dir
 source "$script_dir/config"
 
 source "$script_dir/utils"
-export -f debug
 export -f die
+
+# We need our own debug because inside the subshell, this isn't "encode" anymore.
+debug() {
+  if [[ "$DEBUG" =~ encode ]]; then
+    echo -e "$1" >&2
+  fi
+}
+export -f debug
 
 # Base directories that contain details of media processing. "cache" is for temporary things. These shouldn't be committed.
 # "data" is where information is stored about how to process specific files. This should be committed. I normally keep these
