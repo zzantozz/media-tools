@@ -1,2 +1,6 @@
 OUTPUTNAME="The Predator.mkv"
 KEEP_STREAMS=all
+# Has two very short subtitle streams. I can't see a difference between them.
+# I would've picked the other one (4), but this one was marked default when
+# ripped.
+FORCED_SUB_INPUT_STREAM=5
