@@ -877,9 +877,6 @@ EOF
     [ -n "$COMPLEXFILTER" ] && {
       CMD+=("${encodings[@]}")
     }
-    # Suggested by Gemini to handle edge cases where cutting video might result in negative timestamps from weird
-    # bluray lead-in buffers or something. It claims it can't hurt anything and is a good safety net.
-    CMD+=(-avoid_negative_ts make_zero)
     if [ -n "$FORCED_SUB_INPUT_STREAM" ]; then
       # Forced subs configured. Use that stream - it's the index in the input.
       forced_sub_stream="$FORCED_SUB_INPUT_STREAM"
@@ -899,6 +896,9 @@ EOF
         die "Couldn't find output for forced subtitle input stream $input_stream_id. Is it mapped?"
       CMD+=(-disposition:"$output_sub_index" forced)
     fi
+    # Suggested by Gemini to handle edge cases where cutting video might result in negative timestamps from weird
+    # bluray lead-in buffers or something. It claims it can't hurt anything and is a good safety net.
+    CMD+=(-avoid_negative_ts make_zero)
     CMD+=(-metadata:s:0 "encoded_by=My smart encoder script")
     if [ "$QUALITY" != "rough" ] && [ -n "$TRANSCODE_AUDIO" ]; then
       CMD+=(-metadata:s:1 "title=Transcoded Surround for Sonos")
