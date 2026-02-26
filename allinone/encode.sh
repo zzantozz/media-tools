@@ -151,26 +151,47 @@ function encode_one {
   # Now get both configs loaded. Load main config first, in case
   # there's something I'd like to set at the top level but override
   # for certain files.
-  [ -f "$config_file" ] || {
-    echo "Missing config file: $config_file" >&2
-    exit 1
-  }
-  [ -f "$main_config" ] || {
-    echo "Missing main config file: $main_config" >&2
-    exit 1
-  }
+  [ -f "$main_config" ] || die "Missing main config file: $main_config"
   debug "Loading main config: $main_config"
   # shellcheck disable=SC1090
-  source "$main_config" || {
-    echo "Failed to source $main_config" >&2
+  source "$main_config" || die "Failed to source $main_config"
+
+  if [ -f "$config_file" ]; then
+    debug "Using config: $config_file"
+    # shellcheck disable=SC1090
+    source "$config_file" || die "Failed to source $config_file"
+  elif [ -n "$ENC_UNMAPPED_TITLES" ]; then
+    # Take a stab at encoding it anyway. There are SO MANY special features I haven't taken the time to categorize.
+    # This, if it works, will at least get them in plex associated with the title they belong to. We'll need to assign
+    # it an output name that won't change. A hash of the input path would work, though it's going to make for long
+    # file names...
+    id="$(echo "$input_rel_path" | sha1sum | cut -d ' ' -f 1)"
+    # Now things get tricky. We need to know if it's a movie or a tv show, and we haven't figured that out because it
+    # normally depends on loading the config.
+    # A simple way to decide would be to defer until something from the input directory has already been mapped. We
+    # should be able to tell by looking for a dir named MAIN_NAME in the movies and tv output dirs. Remember that TV
+    # specials can optionally be mapped to the movies dir for better organization. If that's being done, then we
+    # probably want to put these there, too, so check the movies dir first.
+    unmapped_title_type=unknown
+    if [ -d "$MOVIESDIR/$MAIN_NAME" ]; then
+      unmapped_title_type=movie
+    elif [ -d "$TVSHOWSDIR/$MAIN_NAME" ]; then
+      unmapped_title_type=tvshow
+    fi
+    if [ "$unmapped_title_type" = movie ]; then
+      OUTPUTNAME="Other/Unmatched Feature ($id).mkv"
+    elif [ "$unmapped_title_type" = tvshow ]; then
+      # Is this naming style going to work?
+      OUTPUTNAME="Season 0/$MAIN_NAME s00e$id.mkv"
+    else
+      die "Couldn't figure out type for unmapped title: '$input_rel_path'"
+    fi
+    # We'll need to choose the streams to keep. It's a required value later.
+    KEEP_STREAMS=all
+  else
+    echo "Missing config file: $config_file" >&2
     exit 1
-  }
-  debug "Using config: $config_file"
-  # shellcheck disable=SC1090
-  source "$config_file" || {
-    echo "Failed to source $config_file" >&2
-    exit 1
-  }
+  fi
 
   # Figure out what our output path is. This will be an absolute
   # path. For movies, it'll be like
