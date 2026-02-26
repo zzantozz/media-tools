@@ -478,6 +478,21 @@ function encode_one {
   VQ=$("$TOOLSDIR/quality.sh" "$input_abs_path") || die "Failed to determine quality "
   debug "Quality: $VQ"
 
+  video_entries_to_get="stream_tags=NUMBER_OF_FRAMES-eng,DURATION-eng"
+  video_data_raw="$(ffprobe -v error -select_streams 0 -show_entries $video_entries_to_get -of default=nw=1 -i "$input_abs_path")" || \
+    die "Failed to get video data."
+  declare -A video_data
+  while read -r line; do
+    IFS='=' read -ra kv <<<"$line"
+    k="${kv[0]}"
+    v="${kv[1]}"
+    video_data["$k"]="$v"
+  done <<<"$video_data_raw"
+
+  [ -n "${video_data[*]}" ] || die "Haven't read video_data when trying to extract info from it"
+  input_length="${video_data[TAG:DURATION-eng]%.*}"
+  input_frames="${video_data[TAG:NUMBER_OF_FRAMES-eng]}"
+
   # Okay, at this point, I think we've gathered all the information
   # we need about the input video. Now on to figuring out what to do
   # with it.
@@ -498,6 +513,8 @@ function encode_one {
     debug "Duration: $input_length"
     echo "Recording details to $details_file"
     mkdir -p "$(dirname "$details_file")"
+    [ -n "$input_length" ] || die "Don't have input_length for details file"
+    [ -n "$input_size" ] || die "Don't have input_size for details file"
     cat <<EOF > "$details_file"
 ORIGINAL_DURATION=$input_length
 ORIGINAL_SIZE=$input_size
@@ -760,21 +777,8 @@ EOF
     exit 1
   fi
 
-  video_entries_to_get="stream_tags=NUMBER_OF_FRAMES-eng,DURATION-eng"
-  video_data_raw="$(ffprobe -v error -select_streams 0 -show_entries $video_entries_to_get -of default=nw=1 -i "$input_abs_path")" || \
-    die "Failed to get video data."
-  declare -A video_data
-  while read -r line; do
-    IFS='=' read -ra kv <<<"$line"
-    k="${kv[0]}"
-    v="${kv[1]}"
-    video_data["$k"]="$v"
-  done <<<"$video_data_raw"
-
   # Always display the movie length because I use that to gauge
   # progress when watching the logs.
-  input_length="${video_data[TAG:DURATION-eng]%.*}"
-  input_frames="${video_data[TAG:NUMBER_OF_FRAMES-eng]}"
   echo "  video length: $input_length - $input_frames frames"
 
   # Second loop to actually process the discovered outputs. This builds the output part of the ffmpeg command by putting
