@@ -1,2 +1,6 @@
 OUTPUTNAME="X-Men.mkv"
 KEEP_STREAMS=all
+# There's a weird subtitle stream with thumbnails of characters here. The detector thinks it's forced subs.
+# On the plus side, it was proactively detected because the script checks both frame and byte count, and
+# it noticed that only frames were below the detection threshold, not bytes.
+FORCED_SUB_INPUT_STREAM=none
