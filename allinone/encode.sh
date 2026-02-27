@@ -898,6 +898,8 @@ EOF
         die "Couldn't find output for forced subtitle input stream $input_stream_id. Is it mapped?"
       CMD+=(-disposition:"$output_sub_index" forced)
     fi
+    # The infer_no_subs below isn't working with matroska! A bug maybe? Ugh!
+    CMD+=(-disposition:s -default)
     # Suggested by Gemini to handle edge cases where cutting video might result in negative timestamps from weird
     # bluray lead-in buffers or something. It claims it can't hurt anything and is a good safety net.
     CMD+=(-avoid_negative_ts make_zero)
