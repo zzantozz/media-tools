@@ -193,6 +193,11 @@ function encode_one {
     exit 1
   fi
 
+  if [ -n "$IGNORE_INPUT" ]; then
+    echo "Ignoring input per configuration" >&2
+    exit 0
+  fi
+
   # Figure out what our output path is. This will be an absolute
   # path. For movies, it'll be like
   #
