@@ -55,3 +55,16 @@ for title in "${!segment_map[@]}"; do
     fi
   done
 done
+
+longest=0
+for s in "${segment_map[@]}"; do
+  if [ "${#s}" -gt "$longest" ]; then
+    longest="${#s}"
+  fi
+done
+
+echo
+printf "%$((longest-4))s%s\n" "" "-- Segment maps --"
+for title in "${!segment_map[@]}"; do
+  printf "%$((longest+2))s - title %s\n" "${segment_map[title]}" "$title"
+done | sort -n >&2
