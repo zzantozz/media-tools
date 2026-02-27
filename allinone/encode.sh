@@ -755,11 +755,8 @@ EOF
     done <<<"$stream_mappings"
   fi
 
-  mappings=''
-  for key in "${!input_to_output_map[@]}"; do
-    mappings="$mappings $key->${input_to_output_map[$key]}"
-  done
-  debug "Input to output stream mapping:$mappings"
+  mappings="$(for i in "${!input_to_output_map[@]}"; do echo "$i->${input_to_output_map[$i]}"; done | sort -n | tr '\n' ' ')"
+  debug "Input to output stream mapping: $mappings"
 
   VFILTERSTRING="${VFILTERS[0]}"
   i=1
