@@ -86,7 +86,7 @@ EOF
 if [ "$format" = "video" ]; then
     debug "Sampling video file"
     debug " - $(date)"
-    DATA=$("$MYDIR/sample.sh" -i "$input" -f pipe -m 10 | ffmpeg -i pipe: -filter:v idet -f rawvideo -y /dev/null 2>&1 | grep -i 'parsed_idet') || {
+    DATA=$("$MYDIR/sample.sh" -i "$input" -f pipe -m 10 | ffmpeg -i pipe: -nostdin -filter:v idet -f rawvideo -y /dev/null 2>&1 | grep -i 'parsed_idet') || {
 	echo "ffmpeg failed to parse file: '$input'" >&2
 	exit 1
     }

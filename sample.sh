@@ -51,7 +51,7 @@ TOTALSECS=$((h*3600 + m*60 + s))
 # If shorter than the minimum just do the whole thing.
 if [ $TOTALSECS -lt $((MINLENGTH*60)) ]; then
     debug "Input is less than min length of $MINLENGTH minutes, so not sampling"
-    CMD=(ffmpeg -i "$input" -map 0:0 -c copy)
+    CMD=(ffmpeg -nostdin -i "$input" -map 0:0 -c copy)
 else
     # Ignore the two ends of the video because intros and credits tend
     # to have different characteristics.
@@ -77,7 +77,7 @@ else
     done
     debug "Broke into $STREAMCOUNT chunks"
     TOTALLEN=$((CHECKLEN*STREAMCOUNT))
-    CMD=(ffmpeg)
+    CMD=(ffmpeg -nostdin)
 #    [ -n "$USE_GPU" ] && CMD+=(-hwaccel cuda -hwaccel_output_format cuda)
     CMD+=("${INPUTS[@]}")
     CMD+=(-max_muxing_queue_size 1024)
