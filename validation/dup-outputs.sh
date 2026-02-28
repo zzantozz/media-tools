@@ -31,7 +31,8 @@ ONLY_MAP=true "$script_dir/../allinone/encode.sh" &>"$tmp_file" || {
 dups_raw="$(cat "$tmp_file" | grep '^IN:' | sed 's/^IN:.*OUT: //' | sort | uniq -c | grep -v '^      1' | sed 's/^[ 0-9]*//')"
 dups=()
 while read -r output_path; do
-  dups+=("$output_path")
+  # Somehow a blank line can creep in
+  [ -z "$output_path" ] || dups+=("$output_path")
 done <<<"$dups_raw"
 
 if [ "${#dups[@]}" -gt 0 ]; then
@@ -40,6 +41,8 @@ if [ "${#dups[@]}" -gt 0 ]; then
     echo " out: $dup"
     grep -F "OUT: $dup" "$tmp_file" | sed -r 's/^IN: (.*) OUT:.*/   in: \1/'
   done
+else
+  echo "No dups found!"
 fi
 
 work_items="$(ls -1 "$WORKDIR" | wc -l)"
