@@ -102,7 +102,7 @@ while read -r line; do
   if [ "$show_frame_times" = true ] && [[ "$desired_forced" =~ [0-9][0-9]* ]]; then
     # Show dts_time of packets in the stream in csv format, which puts it in a single line. I have no idea what the
     # read_intervals option does.
-    ffprobe -v error -select_streams "$desired_forced" -read_intervals 0%+#11 -show_entries packet=dts_time -of csv=p=0 "$abs_path" | head -5
+    ffprobe -v error -select_streams "$desired_forced" -read_intervals 0%+#11 -show_entries packet=dts_time -of csv=p=0 "$abs_path" | head -10
   fi
 done
 
