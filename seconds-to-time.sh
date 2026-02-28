@@ -10,4 +10,4 @@ seconds="$1"
 
 result="$(secs_to_duration "$seconds")"
 
-echo " -> $result"
+echo "$result"
