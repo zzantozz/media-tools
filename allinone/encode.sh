@@ -1007,7 +1007,7 @@ term_child() {
 filter_input() {
   input_dir="$1"
   input_path="$2"
-  if [ -z "$FILTER_INPUT" ] || echo "$input_path" | grep -Ei "$FILTER_INPUT" &>/dev/null; then
+  if [ -z "$FILTER_INPUT" ] || echo "$input_dir/$input_path" | grep -Ei "$FILTER_INPUT" &>/dev/null; then
     # New shell to put the encoding function in an isolated environment. It has way too many variables to control, and
     # they between invocations!
     printf "%s\0%s" "$input_dir" "$input_path" | bash -c encode_one &
