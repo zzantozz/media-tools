@@ -74,7 +74,7 @@ function secs_to_duration {
   # Use printf for consistent two-digit padding for hours and minutes,
   # and to handle potential single-digit seconds without losing the fractional part.
   # The 'bc' output might start with a '.', so we handle that in the formatting.
-  printf "%02d:%02d:%05.3f\n" "$hours" "$minutes" "$seconds"
+  printf "%02d:%02d:%06.3f\n" "$hours" "$minutes" "$seconds"
 }
 
 ##
