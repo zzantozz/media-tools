@@ -1,2 +1,5 @@
 OUTPUTNAME="Men In Black.mkv"
 KEEP_STREAMS=all
+# There are forced subs, but they're burned in here. It has a weird, graphical sub stream that looks like a visual commentary. That's so large
+# that it makes the normal subtitles look like forced ones here.
+FORCED_SUB_INPUT_STREAM=none
