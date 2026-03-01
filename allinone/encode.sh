@@ -861,13 +861,13 @@ EOF
 
     # Do real video encoding, or speed encode for checking the output?
     if [ "$QUALITY" = "rough" ]; then
-      #CMD+=(-c:0 mpeg2video -threads:0 2)
-      CMD+=(-c:0 libx264 -preset ultrafast)
+      #CMD+=(-c:v:0 mpeg2video -threads:0 2)
+      CMD+=(-c:v:0 libx264 -preset:v:0 ultrafast)
     else
       if [ -n "$USE_GPU" ] && [ -z "$NEVER_GPU" ]; then
-        CMD+=(-c:0 hevc_nvenc)
+        CMD+=(-c:v:0 hevc_nvenc)
       else
-        CMD+=(-c:0 "$encoder" "${encoder_settings[@]}" -crf:0 "$VQ")
+        CMD+=(-c:v:0 "$encoder" "${encoder_settings[@]}" -crf:v:0 "$VQ")
       fi
     fi
     CMD+=(-c:a copy -c:s copy)
