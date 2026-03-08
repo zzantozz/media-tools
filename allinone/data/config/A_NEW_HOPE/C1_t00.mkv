@@ -1,2 +1,3 @@
 OUTPUTNAME="Star Wars Episode 4 - A New Hope.mkv"
 KEEP_STREAMS=all
+FORCED_SUB_INPUT_STREAM=5
