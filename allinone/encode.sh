@@ -617,9 +617,10 @@ EOF
       # If we're going to upscale, we have to have a ratio.
       [ -n "$dar_to_use" ] || die "Failed to determine DAR for title <720 px high"
       # Turn a ratio like "16:9" into a fraction like "16/9" for math
-      dar_fraction="${dar_to_use//: //}"
+      dar_fraction="${dar_to_use//://}"
       # Now the math, helped along by Gemini
       initial_sar="$(echo "scale=4; ($dar_fraction) / ($original_width / $original_height)" | bc -l)"
+      [[ "$initial_sar" =~ ^[0-9.]+$ ]] || die "Failed to get calculate SAR value"
       debug "  setting initial SAR to $initial_sar because DAR was $dar_to_use"
       target_ratio="$(echo "1920/1080" | bc -l)"
       cropped_dar="$(echo "scale=6; $crop_width / $crop_height * $initial_sar" | bc -l)"
@@ -639,6 +640,8 @@ EOF
         # Results have to be divisible by 2 for the yuv420 pixel format
         scaled_width="$(echo "($scaled_height + 1) / 2 * 2" | bc)"
       fi
+      [[ "$scaled_width" =~ ^[0-9]+$ ]] || die "Failed to calculate scaled width"
+      [[ "$scaled_height" =~ ^[0-9]+$ ]] || die "Failed to calculate scaled height"
       upscale_filters="$(printf "$dvd_upscale_format" "$scaled_width" "$scaled_height")"
     fi
   else
