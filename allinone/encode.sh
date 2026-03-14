@@ -574,21 +574,24 @@ EOF
     # regex='Stream #0:0.*Video:.*, ([0-9]*)x([0-9]*) \[.*\], SAR [0-9:]* DAR [0-9:]*, ([0-9.]*) fps, ([0-9.]*) tbr,.*$'
     # This handles both
     regex='Stream #0:0.*Video:.*, ([0-9]*)x([0-9]*) \[.*\].*, ([0-9.]*) fps, ([0-9.]*) tbr,.*$'
+    [[ "$video_stream" =~ $regex ]] || die "Failed to match video stream for input data"
+    original_width="${BASH_REMATCH[1]}"
+    original_height="${BASH_REMATCH[2]}"
+
     if [[ "$CROPPING" =~ ^([0-9]*):([0-9]*):[0-9]*:[0-9]*$ ]]; then
       # If we're cropping the video, this is the size we need to look at, but cropping could be "none"
       width="${BASH_REMATCH[1]}"
       height="${BASH_REMATCH[2]}"
-    elif [[ "$video_stream" =~ $regex ]]; then
-      # If not cropping, then use the size of the incoming video
-      width="${BASH_REMATCH[1]}"
-      height="${BASH_REMATCH[2]}"
     else
-      die "Couldn't determine input height and width"
+      # If not cropping, then use the size of the incoming video
+      width="$original_width"
+      height="$original_height"
     fi
+
     [ "$width" -gt 0 ] || die "Didn't get a good width, was '$width'"
     [ "$height" -gt 0 ] || die "Didn't get a good height, was '$height'"
 
-    if [ "$width" -lt 1000 ]; then
+    if [ "$original_width" -lt 1000 ]; then
       # Nearly half the width of 1080p (1920x1080), so let's upscale.
       debug "Upscaling DVD content"
       target_ratio="$(echo "1920/1080" | bc -l)"
@@ -606,14 +609,16 @@ EOF
     die "Unsupported MODE: '$MODE'"
   fi
 
-  # Figure out the the right aspect ratio in case we need to force it. Old DVD content can have wrong ratios encoded in various locations.
-  # First, check for a config override because some titles are so badly authored that only manual overrides will do.
-  dar_to_use="${OVERRIDE_DAR:-}"
   # Then fall back to inspecting the source video
-  if [ -z "$dar_to_use" ] && [ "$height" -lt 720 ]; then
-    # Fetch the clean DAR metadata (e.g., "16:9", "4:3", or "853:480")
-    # Using default writer to avoid the trailing comma issue
-    detected_dar=$(ffprobe -v error -select_streams v:0 -show_entries stream=display_aspect_ratio -of default=noprint_wrappers=1:nokey=1 "$input_abs_path")
+  if [ "$height" -lt 720 ]; then
+    # Figure out the the right aspect ratio in case we need to force it. Old DVD content can have wrong ratios encoded in various locations.
+    # First, check for a config override because some titles are so badly authored that only manual overrides will do.
+    dar_to_use="${OVERRIDE_DAR:-}"
+
+    if [ -z "$dar_to_use" ]; then
+      # If not set, get the ratio from the input
+      dar_to_use=$(ffprobe -v error -select_streams v:0 -show_entries stream=display_aspect_ratio -of default=noprint_wrappers=1:nokey=1 "$input_abs_path")
+    fi
 
     # Handle bad 3:2 ratio. It's just always wrong. Looks like it occurs when DVD extras are ported to bluray. Happens a lot in Chuck extras.
     if [ "$detected_dar" = "3:2" ]; then
@@ -622,9 +627,10 @@ EOF
     elif [ -n "$detected_dar" ] && [ "$detected_dar" != "N/A" ] && [ "$detected_dar" != "0:1" ]; then
       dar_to_use="$detected_dar"
     fi
+    # If we're going to upscale, we have to have a ratio.
     [ -n "$dar_to_use" ] || die "Failed to determine DAR for title <720 px high"
-    dar_fraction="${target_dar//: //}"
-    initial_sar="$(echo "scale=4; ($target_dar) / ($width / $height)" | bc)"
+    dar_fraction="${dar_to_use//: //}"
+    initial_sar="$(echo "scale=4; ($dar_fraction) / ($original_width / $original_height)" | bc -l)" || die "Failed to calculate SAR for scaling" "dar_to_use" "dar_fraction"
     debug "  setting initial SAR to $initial_sar because DAR was $dar_to_use"
   fi
 
