@@ -541,6 +541,7 @@ EOF
   # Faster denoising with a little more aggressive unsharpening. This is MASSIVELY faster!
   dvd_upscale_width_quick="zscale=w=1920:h=-2:filter=spline36:dither=error_diffusion,hqdn3d=1.5:1.5:6:6,unsharp=5:5:0.6:5:5:0.3"
   dvd_upscale_height_quick="zscale=w=-2:h=1080:filter=spline36:dither=error_diffusion,hqdn3d=1.5:1.5:6:6,unsharp=5:5:0.6:5:5:0.3"
+  dvd_upscale_format="zscale=w=%d:h=%d:filter=spline36:dither=error_diffusion,hqdn3d=1.5:1.5:6:6,unsharp=5:5:0.6:5:5:0.3"
   # For if I want to upscale bluray to 4k, but this will increase the file size a lot (maybe double)
   bluray_upscale="zscale=w=-2:h=2160:filter=spline36:dither=error_diffusion,hqdn3d=1.0:1.0:4:4,unsharp=5:5:0.4:5:5:0.2"
   # For now, I'm not even considering doing an nlmeans bluray upscale because of how insanely long it'll take.
@@ -581,7 +582,9 @@ EOF
     if [[ "$CROPPING" =~ ^([0-9]*):([0-9]*):[0-9]*:[0-9]*$ ]]; then
       # If we're cropping the video, this is the size we need to look at, but cropping could be "none"
       width="${BASH_REMATCH[1]}"
+      crop_width="$width"
       height="${BASH_REMATCH[2]}"
+      crop_height="$height"
     else
       # If not cropping, then use the size of the incoming video
       width="$original_width"
@@ -592,48 +595,56 @@ EOF
     [ "$height" -gt 0 ] || die "Didn't get a good height, was '$height'"
 
     if [ "$original_width" -lt 1000 ]; then
-      # Nearly half the width of 1080p (1920x1080), so let's upscale.
       debug "Upscaling DVD content"
+      # Nearly half the width of 1080p (1920x1080), so let's upscale. Doing this correctly is much harder than I initially thought. The SAR
+      # shows the pixel size of the source. The DAR shows the intended aspect ratio. Through some crazy mathetmatical manipulations, a player
+      # figures out how to show things properly. Usually. Turns out that some things, especially older DVDs, have bad values in their metadata.
+      # We'll try to correct for it as much as possible here, but to start with, some values are just wrong, and we'll need to override them,
+      # so load from config if it's present.
+      dar_to_use="${OVERRIDE_DAR:-}"
+      if [ -z "$dar_to_use" ]; then
+        # If not set in config, get the ratio from the input's metdata (not the "Stream #0:0 ..." video data - that's more error-prone according to Gemini).
+        dar_to_use=$(ffprobe -v error -select_streams v:0 -show_entries stream=display_aspect_ratio -of default=noprint_wrappers=1:nokey=1 "$input_abs_path")
+      fi
+
+      # Handle bad 3:2 ratio. It's just always wrong. Looks like it occurs when DVD extras are ported to bluray. Happens a lot in Chuck extras.
+      if [ "$detected_dar" = "3:2" ]; then
+        dar_to_use="16:9"
+      # Also guard against some garbage values. Gemini says these occur rarely, and I don't see any instances in my current library, but why not?
+      elif [ -n "$detected_dar" ] && [ "$detected_dar" != "N/A" ] && [ "$detected_dar" != "0:1" ]; then
+        dar_to_use="$detected_dar"
+      fi
+      # If we're going to upscale, we have to have a ratio.
+      [ -n "$dar_to_use" ] || die "Failed to determine DAR for title <720 px high"
+      # Turn a ratio like "16:9" into a fraction like "16/9" for math
+      dar_fraction="${dar_to_use//: //}"
+      # Now the math, helped along by Gemini
+      initial_sar="$(echo "scale=4; ($dar_fraction) / ($original_width / $original_height)" | bc -l)"
+      debug "  setting initial SAR to $initial_sar because DAR was $dar_to_use"
       target_ratio="$(echo "1920/1080" | bc -l)"
-      actual_ratio="$(echo "$width/$height" | bc -l)"
-      if [ "$(echo "$actual_ratio > $target_ratio" | bc -l)" = 1 ]; then
+      cropped_dar="$(echo "scale=6; $crop_width / $crop_height * $initial_sar" | bc -l)"
+      debug "  target ratio: $target_ratio - DAR with cropping: $cropped_dar"
+
+      is_wider="$(echo "$cropped_dar > $target_ratio" | bc -l)"
+      if [ "$is_wider" = 1 ]; then
         # Width dominates actual ratio, so scale to width
-       upscale_filters="$dvd_upscale_width_quick"
+        scaled_width=1920
+        scaled_height="$(echo "scale=6; 1920 / $cropped_dar" | bc -l)"
+        # Results have to be divisible by 2 for the yuv420 pixel format
+        scaled_height="$(echo "($scaled_height + 1) / 2 * 2" | bc)"
       else
         # Height dominates actual ratio
-       upscale_filters="$dvd_upscale_height_quick"
+        scaled_height=1080
+        scaled_width="$(echo "scale=6; 1080 * $cropped_dar" | bc)"
+        # Results have to be divisible by 2 for the yuv420 pixel format
+        scaled_width="$(echo "($scaled_height + 1) / 2 * 2" | bc)"
       fi
+      upscale_filters="$(printf "$dvd_upscale_format" "$scaled_width" "$scaled_height")"
     fi
   else
     # Later, add support for POLISHED with the slow denoiser for DVD and possibly upscaling for bluray
     die "Unsupported MODE: '$MODE'"
   fi
-
-  # Then fall back to inspecting the source video
-  if [ "$height" -lt 720 ]; then
-    # Figure out the the right aspect ratio in case we need to force it. Old DVD content can have wrong ratios encoded in various locations.
-    # First, check for a config override because some titles are so badly authored that only manual overrides will do.
-    dar_to_use="${OVERRIDE_DAR:-}"
-
-    if [ -z "$dar_to_use" ]; then
-      # If not set, get the ratio from the input
-      dar_to_use=$(ffprobe -v error -select_streams v:0 -show_entries stream=display_aspect_ratio -of default=noprint_wrappers=1:nokey=1 "$input_abs_path")
-    fi
-
-    # Handle bad 3:2 ratio. It's just always wrong. Looks like it occurs when DVD extras are ported to bluray. Happens a lot in Chuck extras.
-    if [ "$detected_dar" = "3:2" ]; then
-      dar_to_use="16:9"
-    # Also guard against some garbage values. Gemini says these occur rarely, and I don't see any instances in my current library, but why not?
-    elif [ -n "$detected_dar" ] && [ "$detected_dar" != "N/A" ] && [ "$detected_dar" != "0:1" ]; then
-      dar_to_use="$detected_dar"
-    fi
-    # If we're going to upscale, we have to have a ratio.
-    [ -n "$dar_to_use" ] || die "Failed to determine DAR for title <720 px high"
-    dar_fraction="${dar_to_use//: //}"
-    initial_sar="$(echo "scale=4; ($dar_fraction) / ($original_width / $original_height)" | bc -l)" || die "Failed to calculate SAR for scaling" "dar_to_use" "dar_fraction"
-    debug "  setting initial SAR to $initial_sar because DAR was $dar_to_use"
-  fi
-
 
   if [ -f "$DATADIR/cuts/$input_rel_path" ]; then
     [ -z "$upscale_filters" ] || die "I haven't considered how to upscale with cuts."
