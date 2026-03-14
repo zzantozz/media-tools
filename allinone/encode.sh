@@ -588,7 +588,9 @@ EOF
     else
       # If not cropping, then use the size of the incoming video
       width="$original_width"
+      crop_width="$width"
       height="$original_height"
+      crop_height="$height"
     fi
 
     [ "$width" -gt 0 ] || die "Didn't get a good width, was '$width'"
@@ -619,29 +621,32 @@ EOF
       # Turn a ratio like "16:9" into a fraction like "16/9" for math
       dar_fraction="${dar_to_use//://}"
       # Now the math, helped along by Gemini
-      initial_sar="$(echo "scale=4; ($dar_fraction) / ($original_width / $original_height)" | bc -l)"
+      initial_sar="$(echo "($dar_fraction) / ($original_width / $original_height)" | bc -l)"
       [[ "$initial_sar" =~ ^[0-9.]+$ ]] || die "Failed to get calculate SAR value"
       debug "  setting initial SAR to $initial_sar because DAR was $dar_to_use"
       target_ratio="$(echo "1920/1080" | bc -l)"
-      cropped_dar="$(echo "scale=6; $crop_width / $crop_height * $initial_sar" | bc -l)"
+      cropped_dar="$(echo "($crop_width / $crop_height) * $initial_sar" | bc -l)"
+      [[ "$cropped_dar" =~ ^[0-9.]+$ ]] || die "Failed to calculated cropped DAR value"
       debug "  target ratio: $target_ratio - DAR with cropping: $cropped_dar"
 
       is_wider="$(echo "$cropped_dar > $target_ratio" | bc -l)"
       if [ "$is_wider" = 1 ]; then
         # Width dominates actual ratio, so scale to width
         scaled_width=1920
-        scaled_height="$(echo "scale=6; 1920 / $cropped_dar" | bc -l)"
-        # Results have to be divisible by 2 for the yuv420 pixel format
-        scaled_height="$(echo "($scaled_height + 1) / 2 * 2" | bc)"
+        raw_h="$(echo "1920 / $cropped_dar" | bc -l)"
+        scaled_height="$(echo "($raw_h + 0.5) / 1" | bc)"
       else
         # Height dominates actual ratio
         scaled_height=1080
-        scaled_width="$(echo "scale=6; 1080 * $cropped_dar" | bc)"
-        # Results have to be divisible by 2 for the yuv420 pixel format
-        scaled_width="$(echo "($scaled_height + 1) / 2 * 2" | bc)"
+        raw_w="$(echo "1080 * $cropped_dar" | bc -l) "
+        scaled_width="$(echo "($raw_w + 0.5) / 1" | bc)"
       fi
+      # Results have to be divisible by 2 for the yuv420 pixel format
+      scaled_width=$(( (scaled_width + 1) / 2 * 2 ))
+      scaled_height=$(( (scaled_height + 1) / 2 * 2 ))
       [[ "$scaled_width" =~ ^[0-9]+$ ]] || die "Failed to calculate scaled width"
       [[ "$scaled_height" =~ ^[0-9]+$ ]] || die "Failed to calculate scaled height"
+      debug "  final dimensions: ${scaled_width}x${scaled_height}"
       upscale_filters="$(printf "$dvd_upscale_format" "$scaled_width" "$scaled_height")"
     fi
   else
