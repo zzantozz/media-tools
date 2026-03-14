@@ -355,9 +355,9 @@ function encode_one {
       # conflicts, but if input locking gets messed up, then there could be.
       unique_id="$(shuf -i 1-99999999 -n 1)"
       # Only keeping the .part because it's how I've named these for so long
-      output_tmp_path="$WORKDIR/$tmp_file_name.$unique_id.part"
+      output_tmp_path="$WORKDIR/$tmp_file_name.$unique_id.part.mkv"
     else
-      output_tmp_path="$output_abs_path.part"
+      output_tmp_path="$output_abs_path.part.mkv"
     fi
 
     done_file="$DONEDIR/$MODE/$formatted_output_rel_path"
