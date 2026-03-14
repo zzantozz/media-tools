@@ -606,6 +606,29 @@ EOF
     die "Unsupported MODE: '$MODE'"
   fi
 
+  # Figure out the the right aspect ratio in case we need to force it. Old DVD content can have wrong ratios encoded in various locations.
+  # First, check for a config override because some titles are so badly authored that only manual overrides will do.
+  dar_to_use="${OVERRIDE_DAR:-}"
+  # Then fall back to inspecting the source video
+  if [ -z "$dar_to_use" ] && [ "$height" -lt 720 ]; then
+    # Fetch the clean DAR metadata (e.g., "16:9", "4:3", or "853:480")
+    # Using default writer to avoid the trailing comma issue
+    detected_dar=$(ffprobe -v error -select_streams v:0 -show_entries stream=display_aspect_ratio -of default=noprint_wrappers=1:nokey=1 "$input_abs_path")
+
+    # Handle bad 3:2 ratio. It's just always wrong. Looks like it occurs when DVD extras are ported to bluray. Happens a lot in Chuck extras.
+    if [ "$detected_dar" = "3:2" ]; then
+      dar_to_use="16:9"
+    # Also guard against some garbage values. Gemini says these occur rarely, and I don't see any instances in my current library, but why not?
+    elif [ -n "$detected_dar" ] && [ "$detected_dar" != "N/A" ] && [ "$detected_dar" != "0:1" ]; then
+      dar_to_use="$detected_dar"
+    fi
+    [ -n "$dar_to_use" ] || die "Failed to determine DAR for title <720 px high"
+    dar_fraction="${target_dar//: //}"
+    initial_sar="$(echo "scale=4; ($target_dar) / ($width / $height)" | bc)"
+    debug "  setting initial SAR to $initial_sar because DAR was $dar_to_use"
+  fi
+
+
   if [ -f "$DATADIR/cuts/$input_rel_path" ]; then
     [ -z "$upscale_filters" ] || die "I haven't considered how to upscale with cuts."
     # Note: cuts were added before splitting and are based on input path. I have to rethink how this works with splitting.
@@ -615,6 +638,7 @@ EOF
     EXTRAS=()
     [ "$INTERLACED" = "interlaced" ] && EXTRAS+=("bwdif=mode=1")
     [ "$CROPPING" = none ] || EXTRAS+=("crop=$CROPPING")
+    [ -z "$initial_sar" ] || EXTRAS+=("setsar=1")
     [ "${#EXTRAS[@]}" -gt 0 ] && FILTERCMD+=(-v "$(IFS=,; printf "%s" "${EXTRAS[*]}")")
     mkdir -p "$(dirname "$concat_cache_file")"
     printable=""
@@ -626,13 +650,16 @@ EOF
       echo "filter.sh failed to determine complex filter string" >&2
       exit 1
     }
+    [ -z "$initial_sar" ] || COMPLEXFILTER="setsar=$initial_sar,$COMPLEXFILTER"
     debug "complex_filter: $COMPLEXFILTER"
   else
     VFILTERS=()
+    [ -z "$initial_sar" ] || VFILTERS+=("setsar=$initial_sar")
     [ "$INTERLACED" = interlaced ] && VFILTERS+=("bwdif=mode=1")
     [ "$CROPPING" = none ] || VFILTERS+=("crop=$CROPPING")
     # Upscale *after* deinterlacing, per Claude!
     [ -z "$upscale_filters" ] || VFILTERS+=("$upscale_filters")
+    [ -z "$initial_sar" ] || VFILTERS+=("setsar=1")
   fi
   [ -n "$KEEP_STREAMS" ] || {
     echo "KEEP_STREAMS should be known by now" >&2
