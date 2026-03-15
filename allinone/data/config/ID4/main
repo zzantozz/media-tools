@@ -1,1 +1,3 @@
 MAIN_NAME="Independence Day"
+# Apparently the ID4 DVD is notorious for having incorrect aspect ratio metadata
+OVERRIDE_DAR=16/9
