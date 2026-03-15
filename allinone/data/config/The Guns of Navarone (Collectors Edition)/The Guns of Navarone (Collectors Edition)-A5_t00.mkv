@@ -1,2 +1,5 @@
 OUTPUTNAME="The Guns Of Navarone.mkv"
 KEEP_STREAMS=all
+# It seems like 2.35:1 is what everyone thinks this is, but apparently it was originally recorded in 2.21:1 and
+# it's somehow peeking through here.
+OVERRIDE_DAR=2.21:1
