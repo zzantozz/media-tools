@@ -151,7 +151,10 @@ function encode_one {
   # Now get both configs loaded. Load main config first, in case
   # there's something I'd like to set at the top level but override
   # for certain files.
-  [ -f "$main_config" ] || die "Missing main config file: $main_config"
+  [ -f "$main_config" ] || {
+    echo "Missing main config file: $main_config" >&2
+    exit 1
+  }
   debug "Loading main config: $main_config"
   # shellcheck disable=SC1090
   source "$main_config" || die "Failed to source $main_config"
