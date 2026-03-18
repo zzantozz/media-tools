@@ -1,2 +1,3 @@
 OUTPUTNAME="Lethal Weapon 3.mkv"
 KEEP_STREAMS=all
+OVERRIDE_DAR=16:9
