@@ -1,2 +1,3 @@
 OUTPUTNAME="The Empire Strikes Back {edition-bluray}.mkv"
 KEEP_STREAMS=all
+FORCED_SUB_INPUT_STREAM=none
