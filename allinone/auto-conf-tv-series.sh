@@ -30,7 +30,7 @@ season_regex_group=1
 season_strategy=from_path
 season_episodes=()
 
-while getopts ":n:i:m:x:r:s:g:t:e:o:d:u:" opt; do
+while getopts ":n:i:m:x:r:s:g:t:e:o:d:u:k" opt; do
   case "$opt" in
     n)
       show_name="$OPTARG"
@@ -69,6 +69,9 @@ while getopts ":n:i:m:x:r:s:g:t:e:o:d:u:" opt; do
     u)
       duration_max="$OPTARG"
       ;;
+    k)
+      kill_oversize=true
+      ;;
     *)
       echo "Unrecognized arg: $opt"
       exit 1
@@ -92,12 +95,24 @@ nomatch_season_counter=0
 total_episodes_seen=0
 
 while read -r line; do
-  unset season_from_path num_sodes season episode episode_spec output_name rel_path main_file
+  unset season_from_path num_sodes season episode episode_spec output_name rel_path main_file skip_reason
   size="$(echo "$line" | cut -d " " -f 1)"
   # Handle path carefully - could have multiple whitespaces, which cut and awk will remove
   path="$(echo "$line" | sed -r 's/^\S+\s+//')"
   if [ -n "$episode_size_min" ] || [ -n "$episode_size_max" ]; then
-    if [ "$size" -lt $episode_size_min ]; then num_sodes=0; elif [ "$size" -lt $episode_size_max ]; then num_sodes=1; else num_sodes=2; fi
+    if [ "$size" -lt $episode_size_min ]; then
+      num_sodes=0
+      skip_reason="title is $size bytes, less than min size of $episode_size_min"
+    elif [ "$size" -lt $episode_size_max ]; then
+      num_sodes=1
+    else
+        if [ -n "$kill_oversize" ]; then
+          num_sodes=0
+          skip_reason="title is $size bytes, greater than max size of $episode_size_max, and 'kill oversize' is set"
+        else
+          num_sodes=2
+        fi
+    fi
   fi
   if [ -n "$duration_min" ] || [ -n "$duration_max" ]; then
     duration=$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=DURATION-eng -of default=noprint_wrappers=1:nokey=1 "$path" | cut -d '.' -f 1)
@@ -107,13 +122,20 @@ while read -r line; do
     if [ -n "$duration_min" ] && [ -n "$duration_max" ]; then
       if [ "$secs" -lt "$duration_min_secs" ]; then
         num_sodes=0
+        skip_reason="title is $secs seconds long, less than min duration of $duration_min"
       elif [ "$secs" -lt "$duration_max_secs" ]; then
         num_sodes=1
       else
-        num_sodes=2
+        if [ -n "$kill_oversize" ]; then
+          num_sodes=0
+          skip_reason="title is $secs seconds long, greater than max duration of $duration_max, and 'kill oversize' is set"
+        else
+          num_sodes=2
+        fi
       fi
     elif [ -n "$duration_min" ] && [ "$secs" -lt "$duration_min_secs" ]; then
       num_sodes=0
+      skip_reason="title is $secs seconds long, less than min duration of $duration_min"
     elif [ -n "$duration_max" ] && [ "$secs" -gt "$duration_max_secs" ]; then
       num_sodes=2
     else
@@ -122,7 +144,9 @@ while read -r line; do
   fi
   # In case no min/max of any kind is set...
   [ -n "$num_sodes" ] || num_sodes=1
-  if [ "$num_sodes" = 0 ]; then echo "skip $path"; 
+  if [ "$num_sodes" = 0 ]; then
+      echo "skip $path"
+      echo " - $skip_reason"
   else
     if [ "$season_strategy" = from_path ]; then
       for rex in "${season_regexes[@]}"; do
