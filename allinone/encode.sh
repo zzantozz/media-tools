@@ -932,6 +932,8 @@ EOF
     [ -n "$COMPLEXFILTER" ] && {
       CMD+=("${encodings[@]}")
     }
+    # The infer_no_subs below isn't working with matroska! A bug maybe? Ugh!
+    CMD+=(-disposition:s -default)
     if [ -n "$FORCED_SUB_INPUT_STREAM" ]; then
       # Forced subs configured. Use that stream - it's the index in the input.
       forced_sub_stream="$FORCED_SUB_INPUT_STREAM"
@@ -949,10 +951,9 @@ EOF
       output_sub_index="${input_to_output_map[$input_stream_id]}"
       [ -n "$output_sub_index" ] || \
         die "Couldn't find output for forced subtitle input stream $input_stream_id. Is it mapped?"
+      # Make sure this goes AFTER the option that removes the "default" disposition. It seems to remove this!
       CMD+=(-disposition:"$output_sub_index" forced)
     fi
-    # The infer_no_subs below isn't working with matroska! A bug maybe? Ugh!
-    CMD+=(-disposition:s -default)
     # Suggested by Gemini to handle edge cases where cutting video might result in negative timestamps from weird
     # bluray lead-in buffers or something. It claims it can't hurt anything and is a good safety net.
     CMD+=(-avoid_negative_ts make_zero)
