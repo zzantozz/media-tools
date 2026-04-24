@@ -1,2 +1,3 @@
 OUTPUTNAME="Alien 3 {edition-Special}.mkv"
 KEEP_STREAMS=all
+FORCED_SUB_INPUT_STREAM=none
