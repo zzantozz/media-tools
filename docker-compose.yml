@@ -38,6 +38,7 @@ services:
       - DEBUG=${DEBUG:-}
       - LS_OPTS=${LS_OPTS:-}
       - FILTER_INPUT=${FILTER_INPUT:-}
+      - DRYRUN=${DRYRUN:-}
 
       # Less common flags
       - MODE=${MODE:-STABLE}

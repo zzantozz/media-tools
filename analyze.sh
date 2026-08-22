@@ -57,7 +57,7 @@ trap 'rm -rf -- "$tmp_dir"' EXIT
 
 debug "Sampling input to file"
 debug " - $(date)"
-$MYDIR/sample.sh -i "$input" -m 2 -f file -o "$tmp_dir/sampled.mkv"
+$MYDIR/sample.sh -i "$input" -m 10 -f file -o "$tmp_dir/sampled.mkv"
 debug " - $(date)"
 debug "Analyzing sampled file"
 debug " - $(date)"
