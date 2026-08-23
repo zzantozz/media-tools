@@ -17,6 +17,8 @@
 services:
   ffmpeg:
     image: ffmpeg-for-server
+    ulimits:
+      core: 0
     deploy:
       resources:
         limits:
