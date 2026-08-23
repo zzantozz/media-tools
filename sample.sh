@@ -42,7 +42,7 @@ function debug {
 }
 MYDIR="$(cd "$(dirname "$0")" && pwd)"
 
-IFS=':.' read -r h m s fraction <<<"$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=DURATION-eng -of default=noprint_wrappers=1:nokey=1 "$input")"
+IFS=':.' read -r h m s fraction <<<"$(ffprobe -v error -select_streams v:0 -show_entries stream_tags=DURATION-eng,DURATION -of default=noprint_wrappers=1:nokey=1 "$input")"
 h="10#$h"
 m="10#$m"
 s="10#$s"
