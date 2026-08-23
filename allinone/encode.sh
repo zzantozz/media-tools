@@ -658,14 +658,17 @@ EOF
   fi
 
   if [ -f "$DATADIR/cuts/$input_rel_path" ]; then
-    [ -z "$upscale_filters" ] || die "I haven't considered how to upscale with cuts."
     # Note: cuts were added before splitting and are based on input path. I have to rethink how this works with splitting.
     [ "$SPLIT" = true ] && die "Can't use cuts with splits until I rewrite this!"
     concat_cache_file="$CACHEDIR/concat/$input_rel_path"
     FILTERCMD=("$script_dir/filter.sh" "$input_abs_path" -c "$concat_cache_file")
     EXTRAS=()
+    # Example non-cut filter from ROTJ:
+    #  "setsar=1.18472222222222222222,crop=720:364:0:56,zscale=w=1920:h=820:filter=spline36:dither=error_diffusion,hqdn3d=1.5:1.5:6:6,unsharp=5:5:0.6:5:5:0.3,setsar=1"
+    [ -z "$initial_sar" ] || EXTRAS+=("setsar=$initial_sar")
     [ "$INTERLACED" = "interlaced" ] && EXTRAS+=("bwdif=mode=1")
     [ "$CROPPING" = none ] || EXTRAS+=("crop=$CROPPING")
+    [ -z "$upscale_filters" ] || EXTRAS+=("$upscale_filters")
     [ -z "$initial_sar" ] || EXTRAS+=("setsar=1")
     [ "${#EXTRAS[@]}" -gt 0 ] && FILTERCMD+=(-v "$(IFS=,; printf "%s" "${EXTRAS[*]}")")
     mkdir -p "$(dirname "$concat_cache_file")"
@@ -678,7 +681,6 @@ EOF
       echo "filter.sh failed to determine complex filter string" >&2
       exit 1
     }
-    [ -z "$initial_sar" ] || COMPLEXFILTER="setsar=$initial_sar,$COMPLEXFILTER"
     debug "complex_filter: $COMPLEXFILTER"
   else
     VFILTERS=()
