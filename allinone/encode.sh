@@ -486,9 +486,11 @@ function encode_one {
   VQ=$("$TOOLSDIR/quality.sh" "$input_abs_path") || die "Failed to determine quality "
   debug "Quality: $VQ"
 
-  video_entries_to_get="stream_tags=NUMBER_OF_FRAMES-eng,DURATION-eng"
+  video_entries_to_get="stream_tags=NUMBER_OF_FRAMES-eng,NUMBER_OF_FRAMES,DURATION-eng,DURATION"
   video_data_raw="$(ffprobe -v error -select_streams 0 -show_entries $video_entries_to_get -of default=nw=1 -i "$input_abs_path")" || \
-    die "Failed to get video data."
+      die "Failed to get video data."
+  video_data_line_count="$(printf '%s' "$video_data_raw" | grep -c '^')"
+  [ "$video_data_line_count" = 2 ] || die "Didn't get the right video data; got the following:\n$video_data_raw"
   declare -A video_data
   while read -r line; do
     IFS='=' read -ra kv <<<"$line"
@@ -499,7 +501,9 @@ function encode_one {
 
   [ -n "${video_data[*]}" ] || die "Haven't read video_data when trying to extract info from it"
   input_length="${video_data[TAG:DURATION-eng]%.*}"
+  [ -n "$input_length" ] || input_length="${video_data[TAG:DURATION]%.*}"
   input_frames="${video_data[TAG:NUMBER_OF_FRAMES-eng]}"
+  [ -n "$input_frames" ] || input_frames="${video_data[TAG:NUMBER_OF_FRAMES]}"
 
   # Okay, at this point, I think we've gathered all the information
   # we need about the input video. Now on to figuring out what to do
