@@ -49,8 +49,9 @@ debug "  forced sub stream length threshold: ${threshold}%"
 # Sample output from Rise of Skywalker, with two sub streams, second is alien language:
 # 4,3790,36950983
 # 5,4,18149
-raw_data="$(ffprobe -i "$input" -v error -select_streams s -show_entries stream=index:stream_tags=NUMBER_OF_FRAMES-eng,NUMBER_OF_BYTES-eng -of csv=p=0)" || \
-  die "Failed to get stream data"
+raw_data="$(ffprobe -i "$input" -v error -select_streams s -show_entries stream=index:stream_tags=NUMBER_OF_FRAMES-eng,NUMBER_OF_FRAMES,NUMBER_OF_BYTES-eng,NUMBER_OF_BYTES -of csv=p=0)" || \
+    die "Failed to get stream data"
+[[ "$raw_data" =~ .*,.*,.* ]] || die "Should have gotten exactly three fields from the video; got: $raw_data"
 
 [ -z "${raw_data//[[:blank:]]/}" ] && {
   debug "No subs detected means no forced subs"
