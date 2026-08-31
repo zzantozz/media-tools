@@ -51,7 +51,6 @@ debug "  forced sub stream length threshold: ${threshold}%"
 # 5,4,18149
 raw_data="$(ffprobe -i "$input" -v error -select_streams s -show_entries stream=index:stream_tags=NUMBER_OF_FRAMES-eng,NUMBER_OF_FRAMES,NUMBER_OF_BYTES-eng,NUMBER_OF_BYTES -of csv=p=0)" || \
     die "Failed to get stream data"
-[[ "$raw_data" =~ .*,.*,.* ]] || die "Should have gotten exactly three fields from the video; got: $raw_data"
 
 [ -z "${raw_data//[[:blank:]]/}" ] && {
   debug "No subs detected means no forced subs"
@@ -60,6 +59,8 @@ raw_data="$(ffprobe -i "$input" -v error -select_streams s -show_entries stream=
 }
 
 debug "  raw sub data\n---\n$raw_data\n---"
+
+[[ "$raw_data" =~ .*,.*,.* ]] || die "Should have gotten exactly three fields from the video; got: $raw_data"
 
 readarray -t data_lines <<<"$raw_data"
 [ "${#data_lines[@]}" -gt 0 ] || die "No subtitle streams found"
