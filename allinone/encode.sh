@@ -580,8 +580,9 @@ EOF
     # regex='Stream #0:0.*Video:.*, ([0-9]*)x([0-9]*) \[.*\], ([0-9.]*) fps, ([0-9.]*) tbr,.*$'
     # And this is what DVDs look like
     # regex='Stream #0:0.*Video:.*, ([0-9]*)x([0-9]*) \[.*\], SAR [0-9:]* DAR [0-9:]*, ([0-9.]*) fps, ([0-9.]*) tbr,.*$'
-    # This handles both
-    regex='Stream #0:0.*Video:.*, ([0-9]*)x([0-9]*) \[.*\].*, ([0-9.]*) fps, ([0-9.]*) tbr,.*$'
+    # And then the SW project videos are slightly different - they have SAR and DAR like DVDs, but no "[...]" afer the resolution...
+    # regex='Stream #0:0.*Video:.*, ([0-9]*)x([0-9]*) \[.*\].*, ([0-9.]*) fps, ([0-9.]*) tbr,.*$'
+    regex='Stream #0:0.*Video:.*, ([0-9]*)x([0-9]*).* ([0-9.]*) fps, ([0-9.]*) tbr,.*$'
     [[ "$video_stream" =~ $regex ]] || die "Failed to match video stream for input data"
     original_width="${BASH_REMATCH[1]}"
     original_height="${BASH_REMATCH[2]}"
