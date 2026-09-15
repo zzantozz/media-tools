@@ -25,12 +25,13 @@ show_name=""
 input_dir_matches=()
 nomatch_seasons=()
 title_ignores=("Something to ignore because it can't be empty")
+title_includes=()
 season_regexes=("Season (.)" "SEASON (.)")
 season_regex_group=1
 season_strategy=from_path
 season_episodes=()
 
-while getopts ":n:i:m:x:r:s:g:t:e:o:d:u:k" opt; do
+while getopts ":n:i:m:x:r:s:g:t:e:o:d:u:ka:" opt; do
   case "$opt" in
     n)
       show_name="$OPTARG"
@@ -62,6 +63,9 @@ while getopts ":n:i:m:x:r:s:g:t:e:o:d:u:k" opt; do
       ;;
     o)
       title_ignores+=("$OPTARG")
+      ;;
+    a)
+      title_includes+=("$OPTARG")
       ;;
     d)
       duration_min="$OPTARG"
@@ -142,7 +146,14 @@ while read -r line; do
       num_sodes=1
     fi
   fi
-  # In case no min/max of any kind is set...
+  # Force inclusion of specific titles. This is for when most episodes fall in a specific time range, but maybe one or
+  # two are special.
+  for title_include in "${title_includes[@]}"; do
+    if [[ "$path" = *${title_include}* ]]; then
+      num_sodes=1
+    fi
+  done
+  # In case we haven't determined anything yet, assume we should call this an episode
   [ -n "$num_sodes" ] || num_sodes=1
   if [ "$num_sodes" = 0 ]; then
       echo "skip $path"
