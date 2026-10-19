@@ -163,22 +163,25 @@ while read -r line; do
       for rex in "${season_regexes[@]}"; do
         if [[ "$path" =~ $rex ]]; then
           season_from_path="${BASH_REMATCH[$season_regex_group]}"
+	  debug "Matched a season regex to get season from path: $rex"
           break;
         fi
       done
       if [ -z "$season_from_path" ]; then
+        debug "Trying to determine season based on path that doesn't match a regex; add seasons with -s"
         dir="$(dirname "$path")"
         if [ -n "${nomatch_season_cache[$dir]}" ]; then
           season_from_path="${nomatch_season_cache[$dir]}"
-        else
-          next_nomatch_season="${nomatch_seasons[$nomatch_season_counter]}"
-          [ -n "$next_nomatch_season" ] || die "No season regex match and no 'nomatch season' set for this path: $dir (set season regex with -r)"
-          nomatch_season_cache["$dir"]="$next_nomatch_season"
-          season_from_path="$next_nomatch_season"
+	  debug "Already matched a season for this input dir; using season from cache for: $dir"
+	elif [ "${#nomatch_seasons[@]}" -gt 0 ]; then
+          debug "Assigning this dir the next unmatched season number: $dir"
+          season_from_path="${nomatch_seasons[$nomatch_season_counter]}"
           nomatch_season_counter=$((nomatch_season_counter+1))
+          nomatch_season_cache["$dir"]="$season_from_path"
         fi
       fi
     elif [ "$season_strategy" = count_episodes ]; then
+      debug "Calculating season from episode count"
       local_s=0
       cum_season_episodes="${season_episodes[$local_s]}"
       while [ "$cum_season_episodes" -lt "$((total_episodes_seen+1))" ]; do
@@ -192,7 +195,10 @@ while read -r line; do
     fi
     [ -n "$season_from_path" ] || die "Couldn't determine season"
     if [ $season_from_path != $last_season ]; then raw_episode=1; fi
-    season=$season_from_path; episode=$raw_episode
+    season=$season_from_path
+    debug "Season is $season"
+    episode=$raw_episode
+    debug "Episode is $episode"
     episode_spec="$(printf "e%02d" "$episode")"
     if [ $num_sodes = 2 ]; then episode_spec="$(printf "e%02d-e%02d" "$episode" "$((episode+1))")"; fi
     output_name="$(printf "Season $season/$show_name s%02d%s.mkv" "$season" "$episode_spec")"
