@@ -1,2 +1,3 @@
 OUTPUTNAME='Season 3/Breaking Bad s03e08.mkv'
 KEEP_STREAMS=all
+FORCED_SUB_INPUT_STREAM=3

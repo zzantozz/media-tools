@@ -100,20 +100,24 @@ for i in "${!indexes[@]}"; do
   debug "  check stream $stream_index (subtitle stream $i)"
   frames="${frame_counts[i]}"
   bytes="${byte_counts[i]}"
-  if [ "$frames" -lt "$frame_threshold" ]; then
-    [ "$bytes" -lt "$byte_threshold" ] || die "frame and byte counts disagree"
-    # I've encountered several titles that seem to have duplicate forced subtitle streams. Let's try to avoid those by just letting the
-    # first one win.
-    if [ "${#forced[@]}" -gt 0 ]; then
-      prev_frames="${frame_counts[i-1]}"
-      prev_bytes="${byte_counts[i-1]}"
-      if [ "$frames" = "$prev_frames" ] && [ "$bytes" = "$prev_bytes" ]; then
-	debug "  stream $stream_index appears to be a duplicate of ${indexes[i-1]}, ignoring it"
-	ignore=true
-      fi
-    fi
-    [ "$ignore" = false ] && forced+=("$stream_index")
+  # I used to check bytes vs the byte threshold here, but when the subs are graphical, like on Breaking Bad DVDs, a few sub frames can take up a lot of space, relatively.
+  # I think what I really care about here is how many frames each sub stream has, relative to the one with the most frames because a sub frame tends to be one set of visible
+  # subs, like a sentence of half a sentence.
+  if [ "$frames" -gt "$frame_threshold" ]; then
+    debug "Stream index $stream_index has frames or bytes exceeding threshold: frames=$frames, threshold=$frame_threshold and bytes=$bytes, threshold=$byte_threshold"
+    continue
   fi
+  # I've encountered several titles that seem to have duplicate forced subtitle streams. Let's try to avoid those by just letting the
+  # first one win.
+  if [ "${#forced[@]}" -gt 0 ]; then
+    prev_frames="${frame_counts[i-1]}"
+    prev_bytes="${byte_counts[i-1]}"
+    if [ "$frames" = "$prev_frames" ] && [ "$bytes" = "$prev_bytes" ]; then
+      debug "  stream $stream_index appears to be a duplicate of ${indexes[i-1]}, ignoring it"
+      ignore=true
+    fi
+  fi
+  [ "$ignore" = false ] && forced+=("$stream_index")
 done
 
 if [ ${#forced[@]} -gt 1 ]; then
