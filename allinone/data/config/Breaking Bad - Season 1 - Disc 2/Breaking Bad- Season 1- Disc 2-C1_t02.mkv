@@ -1,2 +1,4 @@
 OUTPUTNAME='Season 1/Breaking Bad s01e06.mkv'
 KEEP_STREAMS=all
+# DAR reads as 4:3, but it's skewed. This is what the other titles are, so it's probably right.
+OVERRIDE_DAR=853:480

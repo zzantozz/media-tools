@@ -614,7 +614,10 @@ EOF
       dar_to_use="${OVERRIDE_DAR:-}"
       if [ -z "$dar_to_use" ]; then
         # If not set in config, get the ratio from the input's metdata (not the "Stream #0:0 ..." video data - that's more error-prone according to Gemini).
-        dar_to_use=$(ffprobe -v error -select_streams v:0 -show_entries stream=display_aspect_ratio -of default=noprint_wrappers=1:nokey=1 "$input_abs_path")
+        detected_dar=$(ffprobe -v error -select_streams v:0 -show_entries stream=display_aspect_ratio -of default=noprint_wrappers=1:nokey=1 "$input_abs_path")
+        debug "Getting DAR from source"
+      else
+        debug "Using preconfigured DAR"
       fi
 
       # Handle bad 3:2 ratio. It's just always wrong. Looks like it occurs when DVD extras are ported to bluray. Happens a lot in Chuck extras.
@@ -626,12 +629,13 @@ EOF
       fi
       # If we're going to upscale, we have to have a ratio.
       [ -n "$dar_to_use" ] || die "Failed to determine DAR for title <720 px high"
+      debug "Using DAR value: $dar_to_use"
       # Turn a ratio like "16:9" into a fraction like "16/9" for math
       dar_fraction="${dar_to_use//://}"
       # Now the math, helped along by Gemini
       initial_sar="$(echo "($dar_fraction) / ($original_width / $original_height)" | bc -l)"
       [[ "$initial_sar" =~ ^[0-9.]+$ ]] || die "Failed to get calculate SAR value"
-      debug "  setting initial SAR to $initial_sar because DAR was $dar_to_use"
+      debug "  setting initial SAR to $initial_sar because DAR was $dar_to_use; if this is wrong, override it in config by setting OVERRIDE_DAR"
       target_ratio="$(echo "1920/1080" | bc -l)"
       cropped_dar="$(echo "($crop_width / $crop_height) * $initial_sar" | bc -l)"
       [[ "$cropped_dar" =~ ^[0-9.]+$ ]] || die "Failed to calculated cropped DAR value"
