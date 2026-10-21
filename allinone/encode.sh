@@ -469,12 +469,8 @@ function encode_one {
   }
   CROPPING="${CONFIG_CROPPING:-$CROPPING}"
   debug "Interlacing: $INTERLACED"
-  [ "$INTERLACED" = progressive ] || [ "$INTERLACED" = interlaced ] || {
-    echo "Invalid interlace value: '$INTERLACED'" >&2
-    echo " - rel path: $input_rel_path" >&2
-    echo " - config  : $config_file" >&2
-    exit 1
-  }
+  [ "$INTERLACED" = progressive ] || [ "$INTERLACED" = interlaced ] || \
+      die "Invalid interlace value: '$INTERLACED'" input_abs_path input_rel_path config_file
   debug "Cropping: $CROPPING"
   [ -z "$CROPPING" ] && {
     echo "No cropping determined. There should always be a value here." >&2

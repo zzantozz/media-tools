@@ -83,13 +83,18 @@ EOF
     exit 1
 }
 
+cleanup() {
+    rm -rf "$tmp_dir"
+}
+
 if [ "$format" = "video" ]; then
     debug "Sampling video file"
     debug " - $(date)"
-    DATA=$("$MYDIR/sample.sh" -i "$input" -f pipe -m 10 | ffmpeg -i pipe: -nostdin -filter:v idet -f rawvideo -y /dev/null 2>&1 | grep -i 'parsed_idet') || {
-	echo "ffmpeg failed to parse file: '$input'" >&2
-	exit 1
-    }
+    tmp_dir="$(mktemp -d)" || die "Failed to make temp dir"
+    trap cleanup EXIT
+    "$MYDIR/sample.sh" -i "$input" -o "$tmp_dir/sampled.mkv" || die "Failed to sample input video" input
+    DATA=$(ffmpeg -i "$tmp_dir/sampled.mkv" -nostdin -filter:v idet -f rawvideo -y /dev/null 2>&1 | grep -i 'parsed_idet') || \
+	die "Failed to detect interlacing" input
     debug " - $(date)"
     debug "Sampled data:"
     debug "$DATA"
@@ -152,11 +157,12 @@ fi
 }
 
 # If nothing has worked yet and undetermined is the highest number, abort
-[ -z "$ANSWER1" ] && [ $UNDET1 -gt $TFF1 ] && [ $UNDET1 -gt $BFF1 ] && [ $UNDET1 -gt $PROG1 ] && {
-    echo "Single frame detection was undetermined" >&2
-    echo -e "$VALUES" >&2
-    exit 1
-}
+# BUT, don't worry about single frame undetermined frames - let's lean toward multi-frame being more correct.
+#[ -z "$ANSWER1" ] && [ $UNDET1 -gt $TFF1 ] && [ $UNDET1 -gt $BFF1 ] && [ $UNDET1 -gt $PROG1 ] && {
+#    echo "Single frame detection was undetermined" >&2
+#    echo -e "$VALUES" >&2
+#    exit 1
+#}
 [ -z "$ANSWER2" ] && [ $UNDET2 -gt $TFF2 ] && [ $UNDET2 -gt $BFF2 ] && [ $UNDET2 -gt $PROG2 ] && {
     echo "Multi frame detection was undetermined" >&2
     echo -e "$VALUES" >&2
